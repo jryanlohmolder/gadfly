@@ -1,6 +1,8 @@
 import json
-import requests
 import os
+import requests
+import time
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -51,7 +53,7 @@ def get_total_votes(api_key, congress):
         if response.status_code == 429:
             while count < run_cap:
                 # call back off function
-                exponential_backoff()
+                exponential_backoff(count)
                 # try calling again
                 response = requests.get(
                     url,
@@ -124,7 +126,7 @@ def get_vote_data(api_key, congress, session, vote_number):
         if response.status_code == 429:
             while count < run_cap:
                 # call exponential backoff
-                exponential_backoff()
+                exponential_backoff(count)
                 # try call again
                 response = requests.get(
                     url,
@@ -245,7 +247,7 @@ def fetch_member_positions(api_key, congress, session, vote_number):
         if response.status_code == 429:
             while count < run_cap:
                 # Call exponential back off
-                exponential_backoff()
+                exponential_backoff(count)
                 # Try call again
                 response = requests.get(
                     url,
@@ -264,7 +266,9 @@ def fetch_member_positions(api_key, congress, session, vote_number):
             response.raise_for_status()
 
         # Convert json data to dict
-        return response.json()
+        vote_data = response.json()
+
+        return vote_data["houseRollCallVoteMemberVotes"]["results"]
 
 
     except requests.exceptions.RequestException as e:
@@ -286,8 +290,14 @@ def store_categories():
 def store_summary():
     pass
 
-def exponential_backoff():
-    pass
+def exponential_backoff(count):
+    """
+    This function is designed to prevent repeated 429 errors
+
+    Args:
+        count (int): The number of runs repeated because of 429 error
+    """
+    time.sleep(2 ** count)
 
 def main():
     pass

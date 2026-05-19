@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
-from congress_api import get_total_votes, get_vote_data, check_legislation_type, get_vote_metadata
+from congress_api import get_total_votes, get_vote_data, check_legislation_type, get_vote_metadata, fetch_member_positions
 
 
 class TestGetTotalVotes(unittest.TestCase):
@@ -191,4 +191,38 @@ class TestGetVoteMetadata(unittest.TestCase):
 
         with self.assertRaises(KeyError):
             get_vote_metadata({"congress": 118})
-    
+
+
+class TestFetchMemberPositions(unittest.TestCase):
+    @patch("congress_api.requests.get")
+    def test_correct_data_return(self, mock_get):
+        """
+        Tests get_member_votes() in congress_api to ensure that a list of dicts containing
+        representatives and their votes are returned.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        """
+        
+        # Create mock vote
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "houseRollCallVoteMemberVotes": {"results": 
+                [
+                    {"firstName": "John", "lastName": "Smith", "voteCast": "Aye"},
+                    {"firstName": "Jane", "lastName": "Doe", "voteCast": "No"},
+                    {"firstName": "King", "lastName": "Billy", "voteCast": "Aye"},
+                ]
+            }
+        }
+
+        # Set the get call
+        mock_get.return_value = mock_response
+
+        # Pass mock data to fetch_member_positions()
+        result = fetch_member_positions("test_key", 118, 1, 42)
+
+        # Assertions
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], dict)
+        self.assertIn(result[1]["voteCast"], {"Aye", "No"})
