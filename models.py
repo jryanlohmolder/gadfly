@@ -1,0 +1,95 @@
+from sqlalchemy import Column, String, Integer, Date, Text, Boolean
+from sqlalchemy.orm import DeclarativeBase
+
+class Base(DeclarativeBase):
+    pass
+
+class Vote(Base):
+    """
+    Represents a single House roll call vote in the votes table.
+
+    Attributes:
+        vote_id (int): Primary key, auto-assigned by the database.
+        congress (int): Congress number (e.g. 118).
+        session (int): Legislative session number.
+        roll_call_number (int): Roll call number for this vote.
+        legislation_number (str): Bill identifier (e.g. 'HR 1234').
+        legislation_type (str): Type of legislation (e.g. 'HR', 'S').
+        result (str): Outcome of the vote (e.g. 'Passed', 'Failed').
+        date (Date): Date the vote was held.
+        description (str): LLM-generated summary, populated after bill text is fetched.
+    """
+
+    __tablename__ = "votes"
+    vote_id = Column(Integer, primary_key=True, autoincrement=True)
+    congress = Column(Integer, nullable=False)
+    session = Column(Integer, nullable=False)
+    roll_call_number = Column(Integer)
+    legislation_number = Column(String)
+    legislation_type = Column(String, nullable=False)
+    result = Column(String, nullable=False)
+    date = Column(Date)
+    description = Column(Text)
+
+
+class Members(Base):
+    """
+    Represents a single member of congress in the members table.
+
+    Attributes:
+        member_id (int): Primary key, auto-assigned by database
+        name (str): name of the representative
+        state (str): state that the representative represents
+        district (int): the district the representative represents
+        chamber (str): specifies if the representative is in the house or senate
+        picture_url (text): provides an image of the representative
+        committees (text): all the committees the represenative sits on
+        legislation_authored (text): lists all the bills the representative has written
+        legislation_co_authored (text): lists all bills representative has coauthored
+
+    """
+    __tablename__ = "members"
+    member_id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False)
+    state = Column(String, nullable=False)
+    district = Column(Integer)
+    party = Column(String)
+    chamber = Column(String, nullable=False)
+    picture_url = Column(Text)
+    committees = Column(Text)
+    legislation_authored = Column(Text)
+    legislation_co_authored = Column(Text)
+
+
+class MemberVotes(Base):
+    """
+    Represents a single member vote in the member votes table
+
+    Attributes:
+        member_id: Taken from the members table
+        categories: Is any combination of the 11 categories the legislation falls under
+        position: the way the represenative voted on that particular legislation (i.e. yea, nay, abstains)
+    """
+
+    __tablename__ = "member_votes"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    member_id = Column(Integer, nullable=False)
+    categories = Column(Text, nullable=False)
+    position = Column(String)
+
+
+class VoteCategories(Base):
+    """
+    Represents a single category for a single vote.
+
+    Attributes:
+        vote_id: Taken from votes table
+        category: single category for that particular vote
+        direction: which way the bill goes (False=left, True=right)
+    """
+
+    __tablename__ = "vote_categories"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    vote_id = Column(Integer)
+    category = Column(Text)
+    direction = Column(Boolean)
