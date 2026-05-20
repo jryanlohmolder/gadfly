@@ -3,6 +3,7 @@ import os
 import requests
 import time
 
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -195,6 +196,9 @@ def get_vote_metadata(vote_data):
         meta_data (dict): Vote meta data including congress, session, roll_call_number,
         legislation_number, legislation_type, result, and date.  
     """
+
+    # Alter date data to date formate
+    date = datetime.strptime(vote_data["date"], "%Y-%m-%d").date()
     
     # Ensure we only get key, value pairs wanted for Vote DB
     return  {
@@ -204,7 +208,7 @@ def get_vote_metadata(vote_data):
         "legislation_number": vote_data["legislation_number"],
         "legislation_type": vote_data["legislation_type"],
         "result": vote_data["result"],
-        "date": vote_data["date"],
+        "date": date,
     } 
 
 def fetch_member_positions(api_key, congress, session, vote_number):
@@ -274,9 +278,6 @@ def fetch_member_positions(api_key, congress, session, vote_number):
     except requests.exceptions.RequestException as e:
         print(f"Network Error {e}")
         raise
-
-def store_member_vote():
-    pass
 
 def fetch_bill():
     pass

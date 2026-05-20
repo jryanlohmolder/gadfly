@@ -1,5 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
+import requests
+
 from congress_api import get_total_votes, get_vote_data, check_legislation_type, get_vote_metadata, fetch_member_positions
 
 
@@ -197,7 +199,7 @@ class TestFetchMemberPositions(unittest.TestCase):
     @patch("congress_api.requests.get")
     def test_correct_data_return(self, mock_get):
         """
-        Tests get_member_votes() in congress_api to ensure that a list of dicts containing
+        Tests fetch_member_positions() in congress_api to ensure that a list of dicts containing
         representatives and their votes are returned.
 
         Args:
@@ -226,3 +228,126 @@ class TestFetchMemberPositions(unittest.TestCase):
         self.assertIsInstance(result, list)
         self.assertIsInstance(result[0], dict)
         self.assertIn(result[1]["voteCast"], {"Aye", "No"})
+
+    @patch("congress_api.requests.get")
+    def test_one_429_then_200(self, mock_get):
+        """
+        Tests fetch_member_positions() retries once on a 429 and succeeds on the subsequent 200.
+
+        Args:
+        mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+        None
+
+        Raises:
+        AssertionError: If result is not a list, length is not 3, or call_count is not 2.
+        """
+        
+        # Create mock call with 429 response
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+        
+        # Create mock call with 200 response
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+        
+        mock_200.json.return_value = {
+        "houseRollCallVoteMemberVotes": {"results": [
+            {"firstName": "John", "lastName": "Smith", "voteCast": "Aye"},
+            {"firstName": "Jane", "lastName": "Doe", "voteCast": "No"},
+            {"firstName": "King", "lastName": "Billy", "voteCast": "Aye"},
+        ]}
+        }
+        
+        # Set the get call
+        mock_get.side_effect = [mock_429, mock_200]
+
+        # Pass mock data to fetch_member_positions()
+        result = fetch_member_positions("test_key", 118, 1, 42)
+        
+        # Assertions
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 3)
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch("congress_api.requests.get")
+    def test_429_exhaustion(self, mock_get):
+        """
+        Tests fetch_member_positions() raises RetryError after 5 consecutive 429 responses.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If RetryError is not raised or call_count is not 5.
+        """
+
+        # Create mock call with 429 response
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+
+        # Set the get call
+        mock_get.return_value = mock_429
+        
+        # Assertions
+        with self.assertRaises(requests.exceptions.RetryError):
+            fetch_member_positions("test_key", 118, 1, 42)
+        self.assertEqual(mock_get.call_count, 6)
+
+    @patch("congress_api.requests.get")
+    def test_non_429_http_error(self, mock_get):
+        """
+        Tests fetch_member_positions() raises HTTPError immediately on a non-429 HTTP error.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If HTTPError is not raised or call_count is not 1.
+        """
+
+        # Create mock 404 error
+        mock_404 = MagicMock()
+        mock_404.status_code = 404
+        
+        # Make mock response return HTTPError
+        mock_404.raise_for_status.side_effect = requests.exceptions.HTTPError
+        
+        # Set the get call
+        mock_get.return_value = mock_404
+        
+        # Assertions
+        with self.assertRaises(requests.exceptions.HTTPError):
+            fetch_member_positions("test_key", 118, 1, 42)
+        self.assertEqual(mock_get.call_count, 1)
+
+    @patch("congress_api.requests.get")
+    def test_connection_error(self, mock_get):
+        """
+        Tests fetch_member_positions() raises RequestException immediately on a network error.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If RequestException is not raised or call_count is not 1.
+        """
+
+        # Set get call
+        mock_get.side_effect = requests.exceptions.ConnectionError
+
+        # Assertions
+        with self.assertRaises(requests.exceptions.RequestException):
+            fetch_member_positions("test_key", 118, 1, 42)
+        self.assertEqual(mock_get.call_count, 1)
+

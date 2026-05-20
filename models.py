@@ -32,7 +32,7 @@ class Vote(Base):
     description = Column(Text)
 
 
-class Members(Base):
+class Member(Base):
     """
     Represents a single member of congress in the members table.
 
@@ -61,7 +61,7 @@ class Members(Base):
     legislation_co_authored = Column(Text)
 
 
-class MemberVotes(Base):
+class MemberVote(Base):
     """
     Represents a single member vote in the member votes table
 
@@ -74,7 +74,7 @@ class MemberVotes(Base):
     __tablename__ = "member_votes"
     id = Column(Integer, primary_key=True, autoincrement=True)
     member_id = Column(Integer, nullable=False)
-    categories = Column(Text, nullable=False)
+    vote_id = Column(Integer, nullable=False)
     position = Column(String)
 
 
