@@ -37,54 +37,45 @@ def get_total_votes(api_key, congress):
     # Set url
     url = f"https://api.congress.gov/v3/house-vote/{congress}"
     
-    try:
-        # Build the request headers using api_key
-        headers = {"X-API-KEY": api_key}
-        params = {"limit": 1}
+    while count < run_cap:
+        try:
+            # Build the request headers using api_key
+            headers = {"X-API-KEY": api_key}
+            params = {"limit": 1}
 
-        # Make a GET request to the house-vote endpoint with limit=1
-        # Just get the pagination metadata
-        response = requests.get(
-            url,
-            headers = headers,
-            params = params,
-        )
+            # Make a GET request to the house-vote endpoint with limit=1
+            # Just get the pagination metadata
+            response = requests.get(
+                url,
+                headers = headers,
+                params = params,
+            )
 
-        # If receive a 429
-        if response.status_code == 429:
-            while count < run_cap:
+            # If receive a 429
+            if response.status_code == 429:
                 # call back off function
                 exponential_backoff(count)
-                # try calling again
-                response = requests.get(
-                    url,
-                    headers = headers,
-                    params = params,
-                )
-
-                # check if call worked
-                if response.status_code == 200:
-                    vote_count = response.json()["pagination"]["count"]
-                    break
                 
                 # Increase count
                 count += 1
 
                 if count == run_cap:
                     raise requests.exceptions.RetryError("Max retries exceeded for get_total_votes")
-        
-        else:
+                # Retry from top of the loop
+                continue
+            
+            
             # Check for other http errors
             response.raise_for_status()
             # Extract the total count from the response
             vote_count = response.json()["pagination"]["count"]
 
-        # Return the total as an integer
-        return vote_count
-    
-    except requests.exceptions.RequestException as e:
-        print(f"Network error: {e}")
-        raise
+            # Return the total as an integer
+            return vote_count
+        
+        except requests.exceptions.RequestException as e:
+            print(f"Network error: {e}")
+            raise
 
 def get_vote_data(api_key, congress, session, vote_number):
     """
@@ -113,57 +104,51 @@ def get_vote_data(api_key, congress, session, vote_number):
     # set url
     url = f"https://api.congress.gov/v3/house-vote/{congress}/{session}/{vote_number}"
 
-    try:
-        # Build request headers
-        headers = {"X-API-KEY": api_key}
+    while count < run_cap:
+        try:
+            # Build request headers
+            headers = {"X-API-KEY": api_key}
 
-        # Make a GET request to the vote_number end point
-        response = requests.get(
-            url,
-            headers = headers
-        )
+            # Make a GET request to the vote_number end point
+            response = requests.get(
+                url,
+                headers = headers
+            )
 
-        # If receive a 429
-        if response.status_code == 429:
-            while count < run_cap:
-                # call exponential backoff
+            # If receive a 429
+            if response.status_code == 429: 
+                # Call exponential backoff
                 exponential_backoff(count)
-                # try call again
-                response = requests.get(
-                    url,
-                    headers = headers
-                )
-
-                # check if call worked
-                if response.status_code == 200:
-                    break     
+                # Enumerate count  
                 count += 1
 
                 if count == run_cap:
                     raise requests.exceptions.RetryError("Max retries exceeded for get_total_votes")
-                
-        # handle other http errors
-        response.raise_for_status()
-        
-        # set up base key
-        base_key = response.json()["vote"]
+                # Retry from top of the loop
+                continue
+                    
+            # handle other http errors
+            response.raise_for_status()
+            
+            # set up base key
+            base_key = response.json()["vote"]
 
-        # generate dicitonary holding vote_data
-        vote_data = {
-            "congress": base_key["congress"],
-            "session": base_key["session"],
-            "roll_call_number": base_key["rollCallNumber"],
-            "legislation_number": base_key["bill"]["number"],
-            "legislation_type": base_key["bill"]["type"],
-            "result": base_key["result"],
-            "date": base_key["date"],
-        }
+            # generate dicitonary holding vote_data
+            vote_data = {
+                "congress": base_key["congress"],
+                "session": base_key["session"],
+                "roll_call_number": base_key["rollCallNumber"],
+                "legislation_number": base_key["bill"]["number"],
+                "legislation_type": base_key["bill"]["type"],
+                "result": base_key["result"],
+                "date": base_key["date"],
+            }
 
-        return vote_data
+            return vote_data
 
-    except requests.exceptions.RequestException as e:
-        print(f"Network error: {e}")
-        raise
+        except requests.exceptions.RequestException as e:
+            print(f"Network error: {e}")
+            raise
     
 def check_legislation_type(vote_data):
     """ 
@@ -237,47 +222,43 @@ def fetch_member_positions(api_key, congress, session, vote_number):
     # Set url
     url = f"https://api.congress.gov/v3/house-vote/{congress}/{session}/{vote_number}/members"
 
-    try:
-        # Build request headers
-        headers = {"X-API-KEY": api_key}
+    while count < run_cap:
+        try:
+            # Build request headers
+            headers = {"X-API-KEY": api_key}
 
-        # Make a GET request to the members end point
-        response = requests.get(
-            url,
-            headers = headers,
-        )
+            # Make a GET request to the members end point
+            response = requests.get(
+                url,
+                headers = headers,
+            )
 
-        # If receive a 429:
-        if response.status_code == 429:
-            while count < run_cap:
+            # If receive a 429:
+            if response.status_code == 429:
+                
                 # Call exponential back off
                 exponential_backoff(count)
-                # Try call again
-                response = requests.get(
-                    url,
-                    headers = headers,
-                )
-
-                if response.status_code == 200:
-                    break
+                # Enumerate count
                 count += 1
 
                 if count == run_cap:
                     raise requests.exceptions.RetryError("Max retries exceeded for get_total_votes")
-                
-        else:
+                # Retry from top of loop
+                continue
+                    
+            
             # Check for other HTTP errors
             response.raise_for_status()
 
-        # Convert json data to dict
-        vote_data = response.json()
+            # Convert json data to dict
+            vote_data = response.json()
 
-        return vote_data["houseRollCallVoteMemberVotes"]["results"]
+            return vote_data["houseRollCallVoteMemberVotes"]["results"]
 
 
-    except requests.exceptions.RequestException as e:
-        print(f"Network Error {e}")
-        raise
+        except requests.exceptions.RequestException as e:
+            print(f"Network Error {e}")
+            raise
 
 def fetch_bill():
     pass
