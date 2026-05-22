@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import requests
 
-from congress_api import get_total_votes, get_vote_data, check_legislation_type, get_vote_metadata, fetch_member_positions
+from congress_api import get_total_votes, get_vote_data, check_legislation_type, get_vote_metadata, fetch_member_positions, fetch_bill_url
 
 
 class TestGetTotalVotes(unittest.TestCase):
@@ -591,4 +591,243 @@ class TestFetchMemberPositions(unittest.TestCase):
         with self.assertRaises(requests.exceptions.RequestException):
             fetch_member_positions("test_key", 118, 1, 42)
         self.assertEqual(mock_get.call_count, 1)
+
+
+class TestFetchBillURL(unittest.TestCase):
+    @patch("congress_api.requests.get")
+    def happy_path(self, mock_get):
+        """
+        Tests fetch_bill_url() returns HTM URL when Formatted Text format is available.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        
+        Returns:
+            None
+        
+        Raises:
+            AssertionError: If result is not a string or does not match expected HTM URL.
+        """
+
+        # Create mock URL
+        mock_response = MagicMock()        
+        mock_response.json.return_value = {
+            "textVersions": [
+                {
+                    "formats": [
+                        {"type": "Formatted Text", "url": "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.htm"},
+                        {"type": "PDF", "url": "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.pdf"},
+                        {"type": "Formatted XML", "url": "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.xml"}
+                    ]
+                }
+            ]
+        }
+
+        # Set get call
+        mock_get.return_value = mock_response
+
+        # Have fetch_bill_url get mock url
+        result = fetch_bill_url("test_key", 118, "hr", 3076)
+
+        # Assertions
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.htm")
+
+    @patch("congress_api.requests.get")
+    def xml_fallback(self, mock_get):
+        """
+        Tests fetch_bill_url() returns XML URL when Formatted Text format is unavailable.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        
+        Returns:
+            None
+        
+        Raises:
+            AssertionError: If result is not a string or does not match expected XML URL.
+        """
+    
+        # Create mock URL - XML
+        mock_XML = MagicMock()
+        mock_XML.json.return_value = {
+        "textVersions": [
+                {
+                "formats": [
+                    {"type": "PDF", "url": "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.pdf"},
+                    {"type": "Formatted XML", "url": "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.xml"}
+                    ]
+                }
+            ]
+        }
+
+        # Set get call
+        mock_get.return_value = mock_XML
+
+        # Have fetch_bill_url get mock url (XML)
+        result = fetch_bill_url("test_key", 118, "hr", 3076)
+
+        # Assertions
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.xml")
+
+    @patch("congress_api.requests.get")
+    def no_htm_xml(self, mock_get):
+        """
+        Tests fetch_bill_url() returns ValueError when HTM & XML formats are unavailable.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        
+        Returns:
+            None
+        
+        Raises:
+            AssertionError: If result does not raise a ValueError.
+        """
+        
+        # Create mock URL - no htm or xml
+        mock_url = MagicMock()
+        mock_url.json.return_value = {
+        "textVersions": [
+                {
+                "formats": [
+                    {"type": "PDF", "url": "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.pdf"},
+                    ]
+                }
+            ]
+        }
+
+        # Set get call
+        mock_get.return_value = mock_url
+
+        # Raise ValueError
+        with self.assertRaises(ValueError):
+            fetch_bill_url("test_key", 118, "hr", 3076)
+
+    @patch("congress_api.requests.get")
+    def test_one_429_then_200(self, mock_get):
+        """
+        Tests fetch_bill_url() retries once on a 429 and succeeds on the subsequent 200.
+
+        Args:
+        mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+        None
+
+        Raises:
+        AssertionError: If result is not a string or does not match expected HTM URL, or call_count is not 2.
+        """
+
+        # Create mock 429 response
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+
+        # Create mock 200 response
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+
+        mock_200.json.return_value = {
+            "textVersions": [
+                {
+                    "formats": [
+                        {"type": "Formatted Text", "url": "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.htm"},
+                        {"type": "PDF", "url": "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.pdf"},
+                        {"type": "Formatted XML", "url": "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.xml"}
+                    ]
+                }
+            ]
+        }
+
+        # Set get call
+        mock_get.side_effect = [mock_429, mock_200]
+
+        # Have fetch_bill_url get mock url (XML)
+        result = fetch_bill_url("test_key", 118, "hr", 3076)
+
+        # Assertions
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, "https://www.congress.gov/118/bills/hr3076/BILLS-118hr3076ih.htm")
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch("congress_api.requests.get")
+    def test_429_exhaustion(self, mock_get):
+        """
+        Tests fetch_bill_url() retries once on a 429 and succeeds on the subsequent 200.
+
+        Args:
+        mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+        None
+
+        Raises:
+        AssertionError: If RetryError is not raised or call_count is not 5.
+        """
+
+        # Create mock 429 response
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+
+        # Set get call
+        mock_get.return_value = mock_429
+
+        # Assertions
+        with self.assertRaises(requests.exceptions.RetryError):
+            fetch_bill_url("test_key", 118, "hr", 3076)
+        self.assertEqual(mock_get.call_count, 5)
+
+    @patch("congress_api.requests.get")
+    def test_non_429_http_error(self, mock_get):
+        """
+        Tests fetch_bill_url() raises HTTPError immediately on a non-429 HTTP error.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If HTTPError is not raised or call_count is not 1.
+        """
+
+        # Create mock 403 error
+        mock_403 = MagicMock()
+        mock_403.status_code = 403
+
+        mock_403.raise_for_status.side_effect = requests.exceptions.HTTPError
+
+        # Set the get call
+        mock_get.return_value = mock_403
+
+        # Assertions
+        with self.assertRaises(requests.exceptions.HTTPError):
+            fetch_bill_url("test_key", 118, "hr", 3076)
+        self.assertEqual(mock_get.call_count, 1)
+
+    @patch("congress_api.requests.get")
+    def test_connection_error(self, mock_get):
+        """
+        Tests fetch_bill_url() raises RequestException immediately on a network error.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If RequestException is not raised or call_count is not 1.
+        """
+
+        # Set get call
+        mock_get.side_effect = requests.exceptions.ConnectionError
+
+        # Assertions
+        with self.assertRaises(requests.exceptions.RequestException):
+            fetch_bill_url("test_key", 118, "hr", 3076)
+        self.assertEqual(mock_get.call_count, 1)
+
 

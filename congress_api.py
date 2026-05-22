@@ -242,7 +242,7 @@ def fetch_member_positions(api_key, congress, session, vote_number):
                 count += 1
 
                 if count == run_cap:
-                    raise requests.exceptions.RetryError("Max retries exceeded for get_total_votes")
+                    raise requests.exceptions.RetryError("Max retries exceeded for fetch_member_positions")
                 # Retry from top of loop
                 continue
                     
@@ -260,10 +260,79 @@ def fetch_member_positions(api_key, congress, session, vote_number):
             print(f"Network Error {e}")
             raise
 
-def fetch_bill():
+def fetch_bill_url(api_key, congress, bill_type, bill_number):
+    """
+    Fetch the url for legislation
+
+    Args:
+        api_key (str): Congress API authentication key.
+        congress (int): Congress number (e.g., 118).
+        bill_type (str): Either hr, s, hjres, sjres, from legislation_type in get_vote_data()
+        bill_number (int): from legislation_number in get_vote_data()
+
+    Returns:
+        url: a link to the bills text either in HTM or XML
+
+    Raises:
+        requests.exceptions.HTTPError: If a non-429 HTTP error is returned.
+        requests.exceptions.RequestException: If a network error occurs.
+        ValueError: No readable text format found for bill
+        requests.exceptions.RetryError: If run_cap number is reached.
+    """
+    
+    # Initialize count
+    count = 0
+    run_cap = 5
+
+    # Set url
+    url = f"https://api.congress.gov/v3/bill/{congress}/{bill_type}/{bill_number}/text"
+
+    while count < run_cap:
+        try:
+            # Build request headers
+            headers = {"X-API-KEY": api_key}
+
+            # Make a GET request to text endpoint
+            response = requests.get(
+                url,
+                headers = headers
+            )
+
+            # If receive a 429:
+            if response.status_code == 429:
+                
+                # Call exponential backoff
+                exponential_backoff(count)
+                # Enumerate count
+                count += 1
+
+                if count == run_cap:
+                    raise requests.exceptions.RetryError("Max retries exceeded for fetch_bill")
+                continue
+                
+            # Check for other HTTP errors
+            response.raise_for_status()
+
+            # Get url for bill
+            formats = response.json()["textVersions"][0].get("formats", [])
+            bill_url = next((f["url"] for f in formats if f["type"] == "Formatted Text"), None)
+
+            # If formatted text is not available
+            if bill_url is None:
+                bill_url = next((f["url"] for f in formats if f["type"] == "Formatted XML"), None)
+            if bill_url is None:
+                raise ValueError(f"No readable text format found for bill {bill_type}{bill_number}")
+
+            return bill_url
+
+        except requests.exceptions.RequestException as e:
+            print(f"Network Error {e}")
+            raise
+
+def fetch_bill_text():
     pass
 
-def parse_bill():
+def parse_billl():
     pass
 
 def store_categories():
