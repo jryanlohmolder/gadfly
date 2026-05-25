@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import requests
 
-from congress_api import get_total_votes, get_vote_data, check_legislation_type, get_vote_metadata, fetch_member_positions, fetch_bill_url
+from congress_api import get_total_votes, get_vote_data, check_legislation_type, get_vote_metadata, fetch_member_positions, fetch_bill_url, fetch_bill_text
 
 
 class TestGetTotalVotes(unittest.TestCase):
@@ -754,7 +754,7 @@ class TestFetchBillURL(unittest.TestCase):
     @patch("congress_api.requests.get")
     def test_429_exhaustion(self, mock_get):
         """
-        Tests fetch_bill_url() retries once on a 429 and succeeds on the subsequent 200.
+        Tests fetch_bill_url() retries a total of 5 times on a 429 error.
 
         Args:
         mock_get: Patched requests.get injected by @patch decorator.
@@ -831,3 +831,174 @@ class TestFetchBillURL(unittest.TestCase):
         self.assertEqual(mock_get.call_count, 1)
 
 
+class TestFetchBillText(unittest.TestCase):
+    @patch("congress_api.requests.get")
+    def test_happy_path(self, mock_get):
+        """
+        Tests fetch_bill_text() returns readable text.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        
+        Returns:
+            None
+        
+        Raises:
+            AssertionError: If result is not a string.
+        """
+
+        # Create mock string
+        mock_response = MagicMock()
+        mock_response.text = "<html> Some bill text here </html>"
+
+        # Set get call
+        mock_get.return_value = mock_response
+
+        # Pass mock data to fetch_bill_text()
+        result = fetch_bill_text("test_url")
+
+        # Assertions
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, "<html> Some bill text here </html>")
+
+    @patch("congress_api.requests.get")
+    def test_empty_bill(self, mock_get):
+        """
+        Tests fetch_bill_text() returns a ValueError if there is no text.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        
+        Returns:
+            None
+        
+        Raises:
+            AssertionError: If result is not a ValueError.
+        """
+
+        # Create an empty mock response
+        empty_mock = MagicMock()
+        empty_mock.text = ""
+
+        # Set get call
+        mock_get.return_value = empty_mock
+
+        # Assertions
+        with self.assertRaises(ValueError):
+            fetch_bill_text("test_url")
+
+    @patch("congress_api.requests.get")
+    def test_one_429_then_200(self, mock_get):
+        """
+        Tests fetch_bill_text() retries once on a 429 and succeeds on the subsequent 200.
+
+        Args:
+        mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+        None
+
+        Raises:
+        AssertionError: If result is not a string or does not match expected HTM URL, or call_count is not 2.
+        """
+
+        # Create mock 429
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+
+        # Create mock 200
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+
+        mock_200.text = "<html> Some bill text here </html>"
+
+        # Set get call
+        mock_get.side_effect = [mock_429, mock_200]
+
+        # Pass mock data to fetch_bill_text()
+        result = fetch_bill_text("test_url")
+
+        # Assertions
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, "<html> Some bill text here </html>")
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch("congress_api.requests.get")
+    def test_429_exhaustion(self, mock_get):
+        """
+        Tests fetch_bill_text() retries a total of 5 times on a 429 error.
+
+        Args:
+        mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+        None
+
+        Raises:
+        AssertionError: If RetryError is not raised or call_count is not 5.
+        """
+
+        # Create mock 429 response
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+
+        # Set get call
+        mock_get.return_value = mock_429
+
+        # Assertions
+        with self.assertRaises(requests.exceptions.RetryError):
+            fetch_bill_text("test_url")
+        self.assertEqual(mock_get.call_count, 5)
+
+    @patch("congress_api.requests.get")
+    def test_non_429_http_error(self, mock_get):
+        """
+        Tests fetch_bill_url() raises HTTPError immediately on a non-429 HTTP error.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If HTTPError is not raised or call_count is not 1.
+        """
+
+        # Create mock 404 response
+        mock_404 = MagicMock()
+        mock_404.status_code = 404
+
+        # Create 404 HTTP error for mock_404
+        mock_404.raise_for_status.side_effect = requests.exceptions.HTTPError
+
+        # Set the get call
+        mock_get.return_value = mock_404
+
+        # Assertions
+        with self.assertRaises(requests.exceptions.HTTPError):
+            fetch_bill_text("test_url")
+        self.assertEqual(mock_get.call_count, 1)
+
+    @patch("congress_api.requests.get")
+    def test_connection_error(self, mock_get):
+        """
+        Tests fetch_bill_url() raises RequestException immediately on a network error.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If RequestException is not raised or call_count is not 1.
+        """
+
+        # Set get call
+        mock_get.side_effect = requests.exceptions.ConnectionError
+
+        # Assertions
+        with self.assertRaises(requests.exceptions.ConnectionError):
+            fetch_bill_text("test_url")
+        self.assertEqual(mock_get.call_count, 1)

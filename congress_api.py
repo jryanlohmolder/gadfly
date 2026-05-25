@@ -1,4 +1,3 @@
-import json
 import os
 import requests
 import time
@@ -271,7 +270,7 @@ def fetch_bill_url(api_key, congress, bill_type, bill_number):
         bill_number (int): from legislation_number in get_vote_data()
 
     Returns:
-        url: a link to the bills text either in HTM or XML
+        bill_url: a link to the bills text either in HTM or XML
 
     Raises:
         requests.exceptions.HTTPError: If a non-429 HTTP error is returned.
@@ -307,7 +306,7 @@ def fetch_bill_url(api_key, congress, bill_type, bill_number):
                 count += 1
 
                 if count == run_cap:
-                    raise requests.exceptions.RetryError("Max retries exceeded for fetch_bill")
+                    raise requests.exceptions.RetryError("Max retries exceeded for fetch_bill_url")
                 continue
                 
             # Check for other HTTP errors
@@ -329,10 +328,58 @@ def fetch_bill_url(api_key, congress, bill_type, bill_number):
             print(f"Network Error {e}")
             raise
 
-def fetch_bill_text():
-    pass
+def fetch_bill_text(bill_url):
+    """
+    Fetch the text of the specific legislation.
 
-def parse_billl():
+    Args:
+        bill_url (str): The url linked to the legislation returned from fetch_bill_url()
+
+    Returns:
+        response.text(str): The body of the bill that will be parsed by Claude
+
+    Raises:
+        requests.exceptions.HTTPError: If a non-429 HTTP error is returned.
+        requests.exceptions.RequestException: If a network error occurs.
+        ValueError: No readable text found for bill
+        requests.exceptions.RetryError: If run_cap number is reached.
+    """
+
+    # Initialize count
+    count = 0
+    run_cap = 5
+
+    while count < run_cap:
+        try:
+            # Make GET request to bill url
+            response = requests.get(bill_url)
+
+            # If receive a 429:
+            if response.status_code == 429:
+
+                # call exponential backoff
+                exponential_backoff(count)
+                # enumerate count
+                count += 1
+
+                if count == run_cap:
+                    raise requests.exceptions.RetryError("Max retries exceeded for fetch_bill_text")
+                continue
+
+            # Check for other HTTP errors
+            response.raise_for_status()
+
+            # Return bill text
+            if not response.text or not response.text.strip():
+                raise ValueError(f"Empty response body from {bill_url}")
+            return response.text
+
+        except requests.exceptions.RequestException as e:
+            print(f"Network Error {e}")
+            raise
+    
+
+def parse_bill_text():
     pass
 
 def store_categories():
