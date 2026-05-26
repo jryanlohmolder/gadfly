@@ -29,7 +29,8 @@ class Vote(Base):
     legislation_type = Column(String, nullable=False)
     result = Column(String, nullable=False)
     date = Column(Date)
-    description = Column(Text)
+    chunk_count = Column(Integer)
+    summary = Column(Text)
 
 
 class Member(Base):
@@ -83,9 +84,10 @@ class VoteCategories(Base):
     Represents a single category for a single vote.
 
     Attributes:
-        vote_id: Taken from votes table
+        vote_id: taken from votes table
         category: single category for that particular vote
         direction: which way the bill goes (False=left, True=right)
+        flagged: if the category is problematic
     """
 
     __tablename__ = "vote_categories"
@@ -93,3 +95,22 @@ class VoteCategories(Base):
     vote_id = Column(Integer)
     category = Column(Text)
     direction = Column(Boolean)
+    flagged = Column(Boolean)
+
+class VoteFlags(Base):
+    """
+    Represents a single flag for a particular vote.
+
+    Attributes:
+        vote_id: taken from votes table
+        flag_name: describes what is being flagged
+        severity: red / caution / informational
+        explanation: 1-2 sentences saying why it was flagged
+    """
+
+    __tablename__ = "vote_flags"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    vote_id = Column(Integer)
+    flag_name = Column(Text)
+    severity = Column(Text)
+    explanation = Column(Text)

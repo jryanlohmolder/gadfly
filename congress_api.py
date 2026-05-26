@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Constants
-API_KEY = os.getenv("API_KEY")
+API_KEY = os.getenv("CONGRESS_API_KEY")
 LEGISLATION_TYPES = {"HR", "S", "HJRES", "SJRES"}
 
 
