@@ -382,9 +382,6 @@ def fetch_bill_text(bill_url):
 def parse_bill_text():
     pass
 
-def store_categories():
-    pass
-
 def store_summary():
     pass
 

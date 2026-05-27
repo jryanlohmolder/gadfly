@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Date, Text, Boolean
+from sqlalchemy import Column, String, Integer, Date, Text, Boolean, ForeignKey
 from sqlalchemy.orm import DeclarativeBase
 
 class Base(DeclarativeBase):
@@ -74,12 +74,12 @@ class MemberVote(Base):
 
     __tablename__ = "member_votes"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    member_id = Column(Integer, nullable=False)
-    vote_id = Column(Integer, nullable=False)
+    member_id = Column(Integer, ForeignKey("members.member_id"), nullable=False)  
+    vote_id = Column(Integer, ForeignKey("votes.vote_id"), nullable=False)
     position = Column(String)
 
 
-class VoteCategories(Base):
+class Category(Base):
     """
     Represents a single category for a single vote.
 
@@ -92,12 +92,12 @@ class VoteCategories(Base):
 
     __tablename__ = "vote_categories"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    vote_id = Column(Integer)
+    vote_id = Column(Integer, ForeignKey("votes.vote_id"), nullable=False)
     category = Column(Text)
     direction = Column(Boolean)
     flagged = Column(Boolean)
 
-class VoteFlags(Base):
+class VoteFlag(Base):
     """
     Represents a single flag for a particular vote.
 
@@ -110,7 +110,7 @@ class VoteFlags(Base):
 
     __tablename__ = "vote_flags"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    vote_id = Column(Integer)
+    vote_id = Column(Integer, ForeignKey("votes.vote_id"), nullable=False)
     flag_name = Column(Text)
     severity = Column(Text)
     explanation = Column(Text)
