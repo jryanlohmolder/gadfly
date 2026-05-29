@@ -20,97 +20,101 @@ PARSE_BILL_PROMPT = (
     "You are a nonpartisan bill analysis tool. Analyze the bill text provided "
     "and return only valid JSON — no preamble, no markdown, no code fences.\n\n"
     "If you cannot determine whether a flag is present, default to false.\n\n"
+    "If the bill contains no substantive policy content — meaning it makes no changes "
+    "to law, allocates no resources, restricts no behavior, and grants no powers — "
+    "set all flags to false, all categories to 'Not present', and note in the summary "
+    "that the bill contains no analyzable policy content.\n\n"
     "Return the following structure exactly:\n\n"
     "{\n"
     '    "flags": {\n'
     '        "corruption_or_reduced_oversight": {\n'
     '            "severity": "red",\n'
-    '            "present": True | False,\n'
+    '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
     '        "restricts_individual_rights": {\n'
     '            "severity": "red",\n'
-    '            "present": True | False,\n'
+    '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
     '        "misleading_title": {\n'
     '            "severity": "red",\n'
-    '            "present": True | False,\n'
+    '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
     '        "obfuscation_by_verbosity": {\n'
     '            "severity": "red",\n'
-    '            "present": True | False,\n'
+    '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
     '        "riders": {\n'
     '            "severity": "caution",\n'
-    '            "present": True | False,\n'
+    '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
     '        "cross_referencing_obfuscation": {\n'
     '            "severity": "caution",\n'
-    '            "present": True | False,\n'
+    '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
     '        "internal_contradiction": {\n'
     '            "severity": "informational",\n'
-    '            "present": True | False,\n'
+    '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
     '        "sunset_clauses": {\n'
     '            "severity": "informational",\n'
-    '            "present": True | False,\n'
+    '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        }\n'
     '    },\n'
     '    "categories": {\n'
     '        "Economy & Cost of Living": {\n'
     '            "direction": "Expand spending / stimulus" | "Cut spending / austerity" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        },\n'
     '        "Immigration & Border Security": {\n'
     '            "direction": "Expand pathways / access" | "Restrict entry / tighten borders" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        },\n'
     '        "Democracy & Governance": {\n'
     '            "direction": "Strengthen voting / institutions" | "Restrict voting / reduce oversight" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        },\n'
     '        "Housing & Affordability": {\n'
     '            "direction": "Expand housing access / funding" | "Cut housing programs / deregulate" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        },\n'
     '        "Healthcare": {\n'
     '            "direction": "Expand access / coverage" | "Reduce / restrict access" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        },\n'
     '        "Individual Rights & Civil Liberties": {\n'
     '            "direction": "Strengthen rights / protections" | "Restrict rights / increase restrictions" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        },\n'
     '        "Crime & Public Safety": {\n'
     '            "direction": "Expand rehabilitation / prevention" | "Increase enforcement / penalties" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        },\n'
     '        "Corruption & Government Accountability": {\n'
     '            "direction": "Increase transparency / oversight" | "Reduce oversight / accountability" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        },\n'
     '        "Social Programs & Safety Net": {\n'
     '            "direction": "Expand programs / benefits" | "Cut / reduce programs" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        },\n'
     '        "Environment & Energy": {\n'
     '            "direction": "Expand protections / clean energy" | "Reduce protections / expand fossil fuels" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        },\n'
     '        "Foreign Policy, War & National Security": {\n'
     '            "direction": "Diplomatic / reduce military spending" | "Military expansion / increase defense spending" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": True | False\n'
+    '            "flagged": true | false\n'
     '        }\n'
     '    },\n'
-    '    "summary": "2-3 sentence plain language summary of what the bill actually does, no political framing"\n'
+    '    "summary": "Plain language summary of what the bill actually does. Write as long as the bill requires — a simple bill may need one sentence, a complex bill may need a paragraph. Describe only what the bill mechanically changes: what it adds, removes, restricts, allocates, or requires. Do not characterize intent or likely impact."\n'
     "}\n\n"
     "Category flagging rules:\n"
     "- All 11 categories: flagged if the bill pulls in both directions within that category (internal contradiction).\n"
@@ -118,13 +122,13 @@ PARSE_BILL_PROMPT = (
     "- 'Individual Rights & Civil Liberties': also flagged if direction is 'Restrict rights / increase restrictions'.\n\n"
     "Bill-level flag rules (independent of categories):\n"
     "- internal_contradiction: flag if the bill pulls in both directions within any single category.\n"
-    "- obfuscation_by_verbosity: flag if length and complexity appear disproportionate to what the bill actually does.\n"
+    "- obfuscation_by_verbosity: flag if BOTH of the following are true: (a) the plain language summary of what this bill does can be stated in 1-2 sentences, AND (b) the bill uses heavy legal jargon, excessive cross-references, or repetitive language that a non-lawyer could not reasonably parse.\n"
     "- riders: flag if unrelated provisions are attached to the bill.\n"
     "- cross_referencing_obfuscation: flag if the bill relies heavily on references to other legislation without plain language explanation.\n"
     "- sunset_clauses: flag if provisions expire after a defined period without clear plain language notice.\n"
     "- misleading_title: flag if the bill's title does not accurately represent its content.\n"
-    "- corruption_or_reduced_oversight: flag if the bill reduces government accountability or oversight.\n"
-    "- restricts_individual_rights: flag if the bill restricts individual rights or civil liberties.\n\n"
+    "- corruption_or_reduced_oversight: flag if the bill removes, weakens, or limits any existing mechanism for government accountability or oversight. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n"
+    "- restricts_individual_rights: flag if the bill removes, limits, or adds new restrictions on rights or liberties currently held by individuals. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n\n"
     "BILL TEXT:\n"
 )
 
@@ -134,11 +138,14 @@ SYNTHESIZE_CHUNKS_PROMPT = (
     "Return valid JSON only — no preamble, no markdown, no code fences.\n\n"
     "Use the exact same JSON structure as the chunk results below.\n\n"
     "Rules:\n"
-    "- You may only SET flags to true, never to false\n"
-    "- If a category has contradicting directions across chunks, set direction to 'Internal contradiction' and flagged to true\n"
-    "- Reassess obfuscation_by_verbosity, riders, misleading_title, and cross_referencing_obfuscation "
-    "with the full picture in mind — no single chunk could see the whole bill\n"
-    "- Write a fresh 2-3 sentence plain language summary covering the entire bill\n\n"
+    "- You may only SET flags to true, never to false.\n"
+    "- If a category has contradicting directions across chunks, set direction to 'Internal contradiction' and flagged to true.\n"
+    "- Reassess obfuscation_by_verbosity, riders, misleading_title, cross_referencing_obfuscation, "
+    "and internal_contradiction with the full picture in mind — no single chunk could see the whole bill.\n"
+    "- Write a fresh plain language summary covering the entire bill. Write as long as the bill requires — "
+    "a simple bill may need one sentence, a complex bill may need a paragraph. Describe only what the bill "
+    "mechanically changes: what it adds, removes, restricts, allocates, or requires. Do not characterize "
+    "intent or likely impact.\n\n"
     "CHUNK RESULTS:\n"
 )
 
