@@ -3,6 +3,7 @@ import json
 import os
 import requests
 
+import anthropic
 from anthropic import Anthropic
 
 from dotenv import load_dotenv
@@ -163,13 +164,17 @@ def parse_bill_text(text):
         json.JSONDecodeError: If Claude returns malformed JSON.
         ValueError: If all chunks fail JSON parsing.
         requests.exceptions.RetryError: If run_cap number is reached.
-        anthropic.APIError: If a non-429 API error is returned.
+        Anthropic.APIError: If a non-429 API error is returned.
     """
      
     client = Anthropic()
     
     # Count tokens
-    token_count = client.messages.count_tokens(PARSE_BILL_PROMPT + text)
+    token_response = client.messages.count_tokens(
+        model = "claude-sonnet-4-20250514",
+        messages = [{"role": "user", "content": PARSE_BILL_PROMPT + text}]
+    )
+    token_count = token_response.input_tokens
 
     if token_count <= MAX_BILL_TOKENS:
          # Initialize count
@@ -186,7 +191,7 @@ def parse_bill_text(text):
                 )
                 break
             
-            except Anthropic.RateLimitError:
+            except anthropic.RateLimitError:
                 # Call backoff function
                 exponential_backoff(count)
                 # Increase count
@@ -196,7 +201,7 @@ def parse_bill_text(text):
                 # Retry from top of loop
                 continue
             
-            except Anthropic.APIError as e:
+            except anthropic.APIError as e:
                 print(f"API error: {e}")
                 raise
         
@@ -230,7 +235,7 @@ def parse_bill_text(text):
                     )
                     break
                 
-                except Anthropic.RateLimitError:
+                except anthropic.RateLimitError:
                     # Call backoff function
                     exponential_backoff(count)
                     # Increase count
@@ -240,7 +245,7 @@ def parse_bill_text(text):
                     # Retry from top of loop
                     continue
                 
-                except Anthropic.APIError as e:
+                except anthropic.APIError as e:
                     print(f"API error: {e}")
                     raise
             
@@ -276,7 +281,7 @@ def parse_bill_text(text):
                 )
                 break
             
-            except Anthropic.RateLimitError:
+            except anthropic.RateLimitError:
                 # Call backoff function
                 exponential_backoff(count)
                 # Increase count
@@ -287,7 +292,7 @@ def parse_bill_text(text):
                 # Retry from top of loop
                 continue
             
-            except Anthropic.APIError as e:
+            except anthropic.APIError as e:
                 print(f"API error: {e}")
                 raise
         
@@ -314,6 +319,10 @@ def merge_chunks(chunk_results):
         dict: Merged analysis where flags are set to true if present in any chunk,
               category directions are reconciled across chunks, and summaries are concatenated.
     """
+
+    # Ensure Chunk results are not empty
+    if not chunk_results:
+        raise ValueError("chunk_results cannot be empty")
     
     # Create merged dict to be returned
     merged = {
