@@ -501,36 +501,338 @@ class TestParseBillText(unittest.TestCase):
 
     @patch("anthropic_api.Anthropic")
     def test_non_rate_limit_api_error(self, mock_anthropic_class):
-        pass
+        """
+        Test parse_bill_text() will raise any connection errors with Anthropic API
 
-    @patch("anthropic_api.Anthropic")
-    def test_empty_list(self, mock_anthropic_class):
-        pass
+        Args:
+            mock_anthropic_class: Mocked Anthropic class injected by @patch decorator.
 
-    @patch("anthropic_api.Anthropic")
-    def test_any_true_flag_wins(self, mock_anthropic_class):
-        pass
+        Asserts:
+            Any network error is raised as API Error
+            Only one API call is maded
+        """
+        
+        # Get the instance of the client that is created by Anthropic()
+        mock_client = mock_anthropic_class.return_value
+        
+        # Mock count_tokens to return an integer so it passes the token check
+        mock_count_response = MagicMock()
+        mock_count_response.input_tokens = 100
+        mock_client.messages.count_tokens.return_value = mock_count_response
 
-    @patch("anthropic_api.Anthropic")
-    def test_single_direction_across_chunks(self, mock_anthropic_class):
-        pass
+         # Create mock 401
+        mock_401 = MagicMock()
+        mock_401.status_code = 401
 
-    @patch("anthropic_api.Anthropic")
-    def test_interal_contradiction_across_chunks(self, mock_anthropic_class):
-        pass
+        # Create API Error
+        api_error = anthropic.APIError("api error", request=mock_401, body={})
 
-    @patch("anthropic_api.Anthropic")
-    def test_all_chunks_not_present(self, mock_anthropic_class):
-        pass
+        # Set return value
+        mock_client.messages.create.side_effect = api_error
 
-    @patch("anthropic_api.Anthropic")
-    def test_false_flags_removed(self, mock_anthropic_class):
-        pass
+        # Assertions
+        with self.assertRaises(anthropic.APIError):
+            parse_bill_text("text")
 
-    @patch("anthropic_api.Anthropic")
-    def test_not_present_categories_removed(self, mock_anthropic_class):
-        pass
+        self.assertEqual(mock_client.messages.create.call_count, 1)
 
-    @patch("anthropic_api.Anthropic")
-    def test_all_flags_removed(self, mock_anthropic_lass):
-        pass
+
+class TestMergeChunks(unittest.TestCase):
+    
+    def test_empty_list(self):
+        """
+        Test merge_chunks() can handle an empty list
+
+        Asserts:
+            ValueError is raised when chunk_results is empty
+        """
+        
+        # Create empty list
+        empty_list = []
+        
+        # Assertions
+        with self.assertRaises(ValueError):
+            merge_chunks(empty_list)
+
+    def test_any_true_flag_wins(self):
+        """
+        Test merge_chunks() sets a flag to True if any chunk has True value
+
+        Asserts:
+            True when one out of three values is true
+            True when two out of three values are true
+            True when three out of three values are true
+            False when all three values are false
+        """
+        
+        # Merge chunks
+        chunk_results = [
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": True, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": True, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Not present", "flagged": False}},
+                "summary": "chunk 1 summary"
+            },
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": False, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": True, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Not present", "flagged": False}},
+                "summary": "chunk 2 summary"
+            },
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": False, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": False, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Not present", "flagged": False}},
+                "summary": "chunk 3 summary"
+            },
+        ]
+
+        result = merge_chunks(chunk_results)
+
+        # Assertions
+        self.assertEqual(result["flags"]["corruption_or_reduced_oversight"]["present"], True)
+        self.assertEqual(result["flags"]["restricts_individual_rights"]["present"], True)
+        self.assertEqual(result["flags"]["misleading_title"]["present"], True)
+        self.assertEqual(result["flags"]["sunset_clauses"]["present"], False)
+
+    def test_single_direction_across_chunks(self):
+        """
+        Test merge_chunks() perserves direction in categories when only one direction is present
+
+        Asserts:
+            direction is preserved when all chunks agree
+            flagged remains False when no contradiction exists
+        """
+        
+        # Merge chunks
+        chunk_results = [
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": True, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": True, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Expand access / coverage", "flagged": False}},
+                "summary": "chunk 1 summary"
+            },
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": False, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": True, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Expand access / coverage", "flagged": False}},
+                "summary": "chunk 2 summary"
+            },
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": False, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": False, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Expand access / coverage", "flagged": False}},
+                "summary": "chunk 3 summary"
+            },
+        ]
+
+        result = merge_chunks(chunk_results)
+
+        # Assertion
+        self.assertEqual(result["categories"]["Healthcare"]["direction"], "Expand access / coverage")
+        self.assertEqual(result["categories"]["Healthcare"]["flagged"], False)
+
+    def test_interal_contradiction_across_chunks(self):
+        """
+        Test merge_chunks() documents when there are two opposing directions in a single category
+
+        Asserts:
+            flagged becomes true if there are two different directions
+            direction is set to 'Internal contradiction' if there are two directions
+        """
+        
+        # Merge chunks
+        chunk_results = [
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": True, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": True, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Expand access / coverage", "flagged": False}},
+                "summary": "chunk 1 summary"
+            },
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": False, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": True, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Reduce / restrict access", "flagged": False}},
+                "summary": "chunk 2 summary"
+            },
+        ]
+
+        result = merge_chunks(chunk_results)
+
+        # Assertions
+        self.assertEqual(result["categories"]["Healthcare"]["flagged"], True)
+        self.assertEqual(result["categories"]["Healthcare"]["direction"], "Internal contradiction")
+
+    def test_all_chunks_not_present(self):
+        """
+        Test merge_chunks() perserves direction not present if it is not present for any chunks
+
+        Asserts:
+            direction is preserved when all chunks agree
+            flagged remains False when no contradiction exists
+        """
+        
+        # Merge chunks
+        chunk_results = [
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": True, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": True, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Not present", "flagged": False}},
+                "summary": "chunk 1 summary"
+            },
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": False, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": True, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Not present", "flagged": False}},
+                "summary": "chunk 2 summary"
+            },
+            {
+                "flags": {
+                    "corruption_or_reduced_oversight": {"severity": "red", "present": False, "explanation": None},
+                    "restricts_individual_rights": {"severity": "red", "present": False, "explanation": None},
+                    "misleading_title": {"severity": "red", "present": True, "explanation": None},
+                    "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+                },
+                "categories": {"Healthcare": {"direction": "Not present", "flagged": False}},
+                "summary": "chunk 3 summary"
+            },
+        ]
+
+        result = merge_chunks(chunk_results)
+
+        # Assertions
+        self.assertEqual(result["categories"]["Healthcare"]["direction"], "Not present")
+        self.assertEqual(result["categories"]["Healthcare"]["flagged"], False)
+
+
+class TestAbsentStrip(unittest.TestCase):
+      
+    def test_false_flags_removed(self):
+        """
+        Test strip_absent() removes flags where present is False.
+        
+        Asserts:
+            Flags with present=True are retained
+            Flags with present=False are removed
+        """
+        
+        # Create stripped result
+        result = {
+            "flags": {
+                "corruption_or_reduced_oversight": {"severity": "red", "present": True, "explanation": "Some explanation"},
+                "restricts_individual_rights": {"severity": "red", "present": False, "explanation": None},
+                "misleading_title": {"severity": "red", "present": True, "explanation": "Some explanation"},
+                "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+            },
+            "categories": {
+                "Healthcare": {"direction": "Expand access / coverage", "flagged": False},
+                "Immigration & Border Security": {"direction": "Not present", "flagged": False},
+            },
+            "summary": "test summary"
+        }
+
+        stripped_result = strip_absent(result)
+
+        # Assertion
+        self.assertIn("corruption_or_reduced_oversight", stripped_result["flags"].keys())
+        self.assertIn("misleading_title", stripped_result["flags"].keys())
+        self.assertNotIn("restricts_individual_rights", stripped_result["flags"].keys())
+        self.assertNotIn("sunset_clauses", stripped_result["flags"].keys())
+
+    def test_not_present_categories_removed(self):
+        """
+        Test strip_absent() removes categories where present is False.
+        
+        Asserts:
+            Categories with present=True are retained
+            Categories with present=False are removed
+        """
+        
+        # Create stripped result
+        result = {
+            "flags": {
+                "corruption_or_reduced_oversight": {"severity": "red", "present": True, "explanation": "Some explanation"},
+                "restricts_individual_rights": {"severity": "red", "present": False, "explanation": None},
+                "misleading_title": {"severity": "red", "present": True, "explanation": "Some explanation"},
+                "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+            },
+            "categories": {
+                "Healthcare": {"direction": "Expand access / coverage", "flagged": False},
+                "Immigration & Border Security": {"direction": "Not present", "flagged": False},
+            },
+            "summary": "test summary"
+        }
+
+        stripped_result = strip_absent(result)
+
+        # Assertions
+        self.assertIn("Healthcare", stripped_result["categories"].keys())
+        self.assertNotIn("Immigration & Border Security", stripped_result["categories"].keys())
+
+    def test_all_flags_removed(self):
+        """
+        Test strip_absent() removes all flags if all flags are false leaving an empty dict
+        
+        Asserts:
+            Flags become an empty dict if no flags are present
+        """
+        
+        # Create stripped result
+        result = {
+            "flags": {
+                "corruption_or_reduced_oversight": {"severity": "red", "present": False, "explanation": "Some explanation"},
+                "restricts_individual_rights": {"severity": "red", "present": False, "explanation": None},
+                "misleading_title": {"severity": "red", "present": False, "explanation": "Some explanation"},
+                "sunset_clauses": {"severity": "informational", "present": False, "explanation": None},
+            },
+            "categories": {
+                "Healthcare": {"direction": "Expand access / coverage", "flagged": False},
+                "Immigration & Border Security": {"direction": "Not present", "flagged": False},
+            },
+            "summary": "test summary"
+        }
+
+        stripped_result = strip_absent(result)
+
+        # Assertions
+        self.assertEqual(stripped_result["flags"], {})
