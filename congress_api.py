@@ -378,12 +378,21 @@ def fetch_bill_text(bill_url):
             print(f"Network Error {e}")
             raise
     
+def get_all_members(api_key, congress):
+    members = []
+    url = f"https://api.congress.gov/v3/member/congress/{congress}?api_key={api_key}&limit=20"
+    
+    while url:
+        continue
+        # make API call (with error handling)
+        
+        # loop over members on this page
 
-def parse_bill_text():
-    pass
+            # extract fields and append to members
 
-def store_summary():
-    pass
+        # set url to pagination["next"] or None
+    
+    return members
 
 def exponential_backoff(count):
     """
