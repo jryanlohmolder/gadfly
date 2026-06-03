@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import requests
 
-from congress_api import get_total_votes, get_vote_data, check_legislation_type, get_vote_metadata, fetch_member_positions, fetch_bill_url, fetch_bill_text
+from congress_api import get_total_votes, get_vote_data, check_legislation_type, get_vote_metadata, fetch_member_positions, fetch_bill_url, fetch_bill_text, get_all_members
 
 
 class TestGetTotalVotes(unittest.TestCase):
@@ -1002,3 +1002,369 @@ class TestFetchBillText(unittest.TestCase):
         with self.assertRaises(requests.exceptions.ConnectionError):
             fetch_bill_text("test_url")
         self.assertEqual(mock_get.call_count, 1)
+
+
+class TestGetAllMembers(unittest.TestCase):
+
+    @patch("congress_api.requests.get")
+    def test_happy_path_single_page(self, mock_get):
+        """
+        Tests get_all_members() returns a list of correctly parsed member dicts when 
+        the API returns a single page with no next URL.
+        
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        
+        Raises:
+            AssertionError: If result is not a list, or member fields are incorrect.
+        """
+
+        # Mock data
+        MOCK_PAGE_1 = {
+            "members": [
+                {
+                    "bioguideId": "B001288",
+                    "name": "Booker, Cory A.",
+                    "state": "New Jersey",
+                    "partyName": "Democratic",
+                    "depiction": {
+                        "imageUrl": "https://www.congress.gov/img/member/b001288_200.jpg",
+                        "attribution": "Courtesy U.S. Senate"
+                    },
+                    "terms": {"item": [{"chamber": "Senate", "startYear": 2013}]}
+                }
+            ],
+            "pagination": {"count": 1, "next": None}
+        }
+        
+        # Create mock response
+        mock_response = MagicMock()
+        mock_response.json.return_value = MOCK_PAGE_1
+
+        # Set get call
+        mock_get.return_value = mock_response
+
+        # Call the function
+        result = get_all_members("test_key", 119)
+
+        # Assertions
+        self.assertIsInstance(result, list)
+        self.assertEqual(result[0]["member_id"], "B001288")
+        self.assertEqual(result[0]["name"], "Booker, Cory A.")
+        self.assertEqual(result[0]["chamber"], "Senate")
+
+    @patch("congress_api.requests.get")
+    def test_happy_path_multiple_pages(self, mock_get):
+        """
+        Tests get_all_members() returns a list of correctly parsed member dicts when 
+        the API returns a multiple pages with one having a next URL.
+        
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        
+        Raises:
+            AssertionError: If result is not a list, member fields are incorrect, or two 
+            calls aren't made.
+        """
+
+        # Mock data
+        MOCK_PAGE_1 = {
+            "members": [
+                {
+                    "bioguideId": "B001288",
+                    "name": "Booker, Cory A.",
+                    "state": "New Jersey",
+                    "partyName": "Democratic",
+                    "depiction": {
+                        "imageUrl": "https://www.congress.gov/img/member/b001288_200.jpg",
+                        "attribution": "Courtesy U.S. Senate"
+                    },
+                    "terms": {"item": [{"chamber": "Senate", "startYear": 2013}]}
+                }
+            ],
+            "pagination": {"count": 1, "next": "https://api.congress.gov/v3/member/congress/119?offset=20&limit=20&format=json"}
+        }
+
+        MOCK_PAGE_2 = {
+            "members": [
+                {
+                    "bioguideId": "W000779",
+                    "name": "Wyden, Ron",
+                    "state": "Oregon",
+                    "partyName": "Democratic",
+                    "depiction": {
+                        "imageUrl": "https://www.congress.gov/img/member/w000779_200.jpg",
+                        "attribution": "Courtesy U.S. Senate Historical Office"
+                    },
+                    "terms": {"item": [{"chamber": "House of Representatives", "endYear": 1996, "startYear": 1981}, {"chamber": "Senate", "startYear": 1996}]}
+                }
+            ],
+            "pagination": {"count": 2, "next": None}
+        }
+
+        # Create two mock responses
+        mock_response_1 = MagicMock()
+        mock_response_1.json.return_value = MOCK_PAGE_1
+
+        mock_response_2 = MagicMock()
+        mock_response_2.json.return_value = MOCK_PAGE_2
+
+        # Set get call
+        mock_get.side_effect = [mock_response_1, mock_response_2]
+
+        # Call function
+        result = get_all_members("test_key", 119)
+
+        # Assertions
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["party"], "Democratic")
+        self.assertEqual(result[1]["chamber"], "Senate")
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch("congress_api.requests.get")
+    def test_one_429_then_200(self, mock_get):
+        """
+        Tests get_all_members() continues to run after one 429 error and returns correct values
+        after one 200 response.
+        
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        
+        Raises:
+            AssertionError: If result is not a list, if the list doesn't have one element
+            and if two calls aren't made.
+        """
+
+        # Mock data
+        MOCK_PAGE_1 = {
+            "members": [
+                {
+                    "bioguideId": "B001288",
+                    "name": "Booker, Cory A.",
+                    "state": "New Jersey",
+                    "partyName": "Democratic",
+                    "depiction": {
+                        "imageUrl": "https://www.congress.gov/img/member/b001288_200.jpg",
+                        "attribution": "Courtesy U.S. Senate"
+                    },
+                    "terms": {"item": [{"chamber": "Senate", "startYear": 2013}]}
+                }
+            ],
+            "pagination": {"count": 1, "next": None}
+        }
+
+        # Create mock 429
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+
+        # Create mock 200
+        mock_200 = MagicMock()
+        mock_200.status_code = 200
+
+        mock_200.json.return_value = MOCK_PAGE_1
+
+        # Set get call
+        mock_get.side_effect = [mock_429, mock_200]
+
+        # Call function
+        result = get_all_members("test_key", 119)
+
+        # Assertions
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch("congress_api.requests.get")
+    def test_429_exhaustion(self, mock_get):
+        """
+        Tests get_all_members() gives requests.exception.RetryError if 5 429 errors received.
+        
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        
+        Raises:
+            AssertionError: If a total of 5 calls aren't made.
+        """
+        
+        # Create mock 429
+        mock_429 = MagicMock()
+        mock_429.status_code = 429
+
+        # Set get call
+        mock_get.return_value = mock_429
+
+        # Assertions
+        with self.assertRaises(requests.exceptions.RetryError):
+            get_all_members("test_url", 119)
+        self.assertEqual(mock_get.call_count, 5)
+
+    @patch("congress_api.requests.get")
+    def test_non_429_http_error(self, mock_get):
+        """
+        Tests get_all_members() raises HTTPError immediately on a non-429 HTTP error.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Raises:
+            AssertionError: If HTTPError is not raised or call_count is not 1.
+        """
+
+        # Create mock 404 response
+        mock_404 = MagicMock()
+        mock_404.status_code = 404
+
+        # Create 404 HTTP error for mock_404
+        mock_404.raise_for_status.side_effect = requests.exceptions.HTTPError
+
+        # Set the get call
+        mock_get.return_value = mock_404
+
+        # Assertions
+        with self.assertRaises(requests.exceptions.HTTPError):
+            get_all_members("test_url", 119)
+        self.assertEqual(mock_get.call_count, 1)
+
+    @patch("congress_api.requests.get")
+    def test_network_error(self, mock_get):
+        """
+        Tests get_all_members() raises RequestException immediately on a network error.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Returns:
+            None
+
+        Raises:
+            AssertionError: If RequestException is not raised or call_count is not 1.
+        """
+
+        # Set get call
+        mock_get.side_effect = requests.exceptions.ConnectionError
+
+        # Assertions
+        with self.assertRaises(requests.exceptions.ConnectionError):
+            get_all_members("test_url", 119)
+        self.assertEqual(mock_get.call_count, 1)
+
+    @patch("congress_api.requests.get")
+    def test_member_picture_missing(self, mock_get):
+        """
+        Tests get_all_members() returns None for picture_url and photo_cred 
+        when a member has no depiction field.
+        
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        
+        Raises:
+            AssertionError: If picture_url or photo_cred are not None.
+        """
+
+        # Mock Data
+        MOCK_NO_DEPICTION = {
+            "members": [
+                {
+                    "bioguideId": "A000383",
+                    "name": "Armstrong, Alan",
+                    "state": "Oklahoma",
+                    "partyName": "Republican",
+                    "terms": {"item": [{"chamber": "Senate", "startYear": 2026}]}
+                }
+            ],
+            "pagination": {"count": 1, "next": None}
+        }
+
+        # Set mock response
+        mock_response = MagicMock()
+        mock_response.json.return_value = MOCK_NO_DEPICTION
+
+        # Set get call
+        mock_get.return_value = mock_response
+
+        # Call function
+        result = get_all_members("test_key", 119)
+
+        # Assertions
+        self.assertEqual(result[0]["picture_url"], None)
+
+    @patch("congress_api.requests.get")
+    def test_all_terms_have_end_year(self, mock_get):
+        """
+        Tests get_all_members() excludes members where all terms have an endYear.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Raises:
+            AssertionError: If result list is not empty.
+        """
+        MOCK_ALL_ENDED = {
+            "members": [
+                {
+                    "bioguideId": "M001190",
+                    "name": "Mullin, Markwayne",
+                    "state": "Oklahoma",
+                    "partyName": "Republican",
+                    "depiction": {
+                        "imageUrl": "https://www.congress.gov/img/member/m001190_200.jpg",
+                        "attribution": "Official U.S. Senate Photo"
+                    },
+                    "terms": {"item": [
+                        {"chamber": "House of Representatives", "endYear": 2023, "startYear": 2013},
+                        {"chamber": "Senate", "endYear": 2026, "startYear": 2023}
+                    ]}
+                }
+            ],
+            "pagination": {"count": 1, "next": None}
+        }
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = MOCK_ALL_ENDED
+        mock_get.return_value = mock_response
+
+        result = get_all_members("test_key", 119)
+
+        self.assertEqual(len(result), 0)
+
+    @patch("congress_api.requests.get")
+    def test_multiple_terms_one_without_end_year(self, mock_get):
+        """
+        Tests get_all_members() correctly extracts the current chamber for a member
+        with multiple terms where only one lacks an endYear.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+
+        Raises:
+            AssertionError: If chamber is not correctly identified as Senate.
+        """
+        MOCK_MULTI_TERM = {
+            "members": [
+                {
+                    "bioguideId": "W000779",
+                    "name": "Wyden, Ron",
+                    "state": "Oregon",
+                    "partyName": "Democratic",
+                    "depiction": {
+                        "imageUrl": "https://www.congress.gov/img/member/w000779_200.jpg",
+                        "attribution": "Courtesy U.S. Senate Historical Office"
+                    },
+                    "terms": {"item": [
+                        {"chamber": "House of Representatives", "endYear": 1996, "startYear": 1981},
+                        {"chamber": "Senate", "startYear": 1996}
+                    ]}
+                }
+            ],
+            "pagination": {"count": 1, "next": None}
+        }
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = MOCK_MULTI_TERM
+        mock_get.return_value = mock_response
+
+        result = get_all_members("test_key", 119)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["chamber"], "Senate")

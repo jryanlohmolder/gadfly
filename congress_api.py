@@ -379,20 +379,93 @@ def fetch_bill_text(bill_url):
             raise
     
 def get_all_members(api_key, congress):
-    members = []
+    """
+    Fetch all current members of congress and relevant data to populate Members Database
+
+    Args:
+        api_key (str): Congress API authentication key.
+        congress (int): Congress number (e.g., 118).
+
+    Returns:
+        list[dict]: a list of dicts, each containing members bioguide ID, name, state, party, chamber,
+        url link of picture, and attribution for the picture
+
+    Raises:
+        requests.exceptions.HTTPError: If a non-429 HTTP error is returned.
+        requests.exceptions.RequestException: If a network error occurs.
+        requests.exceptions.RetryError: If run_cap number is reached.
+    """
+
+    # Empty representatives list
+    representatives = []
+
+    # Set url
     url = f"https://api.congress.gov/v3/member/congress/{congress}?api_key={api_key}&limit=20"
+
+    # Set run cap
+    run_cap = 5
     
     while url:
-        continue
-        # make API call (with error handling)
+        # Initialize count
+        count = 0
+        
+        while count < run_cap:
+            try:
+                # make API call (with error handling)
+                response = requests.get(url)
+
+                # If receive a 429
+                if response.status_code == 429:
+                    # Call exponential back off
+                    exponential_backoff(count)
+                    # enumerate count
+                    count += 1
+
+                    if count == run_cap:
+                        raise requests.exceptions.RetryError("Max retries exceeded for get_all_members")
+                    continue
+
+                # Check for other HTTP errors
+                response.raise_for_status()
+
+                # extract members
+                data = response.json()
+                members = data["members"]
+                break
+            
+            except requests.exceptions.RequestException as e:
+                print (f"Network error: {e}")
+                raise
         
         # loop over members on this page
+        for member in members:
+            member_dict = {}
 
             # extract fields and append to members
+            member_dict["member_id"] = member["bioguideId"]
+            member_dict["name"] = member["name"]
+            member_dict["state"] = member["state"]
+            member_dict["party"] = member["partyName"]
+
+            # extract member's chamber
+            for item in member["terms"]["item"]:
+                if "endYear" not in item.keys():
+                    member_dict["chamber"] = item["chamber"]
+
+            member_dict["picture_url"] = member.get("depiction", {}).get("imageUrl")
+            member_dict["photo_cred"] = member.get("depiction", {}).get("attribution")
+
+            # Add member_dict to representatives list
+            if "chamber" in member_dict.keys():
+                representatives.append(member_dict)
 
         # set url to pagination["next"] or None
+        if data["pagination"]["next"]:
+            url = data["pagination"]["next"] + "&api_key=" + api_key
+        else:
+            url = None
     
-    return members
+    return representatives
 
 def exponential_backoff(count):
     """
