@@ -136,7 +136,7 @@ Below the header, tabbed sections:
 
 | Tab | Contents |
 |---|---|
-| **Voting Profile** | 11 category bars showing directional lean (0 direction: *reduce oversight / accountability*
+| **Voting Profile** | 12 category bars showing directional lean (0 direction: *reduce oversight / accountability*
 - **Foreign Policy, War & National Security** direction: *restrict rights / increase restrictions*
 
 ---
