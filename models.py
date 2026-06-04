@@ -45,21 +45,23 @@ class Member(Base):
         chamber (str): specifies if the representative is in the house or senate
         picture_url (text): provides an image of the representative
         committees (text): all the committees the represenative sits on
-        legislation_authored (text): lists all the bills the representative has written
-        legislation_co_authored (text): lists all bills representative has coauthored
+        authored_leg (text): lists all the bills the representative has written
+        co_authored_leg (text): lists all bills representative has coauthored
 
     """
+
     __tablename__ = "members"
-    member_id = Column(Integer, primary_key=True, autoincrement=True)
+    member_id = Column(String, primary_key=True)
     name = Column(String, nullable=False)
     state = Column(String, nullable=False)
     district = Column(Integer)
     party = Column(String)
     chamber = Column(String, nullable=False)
     picture_url = Column(Text)
+    photo_cred = Column(Text)
     committees = Column(Text)
-    legislation_authored = Column(Text)
-    legislation_co_authored = Column(Text)
+    authored_leg = Column(Text)
+    co_authored_leg = Column(Text)
 
 
 class MemberVote(Base):

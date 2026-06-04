@@ -2,39 +2,267 @@ import unittest
 from datetime import date
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from models import Base, Vote, Category, VoteFlag
-from database import store_category, store_vote_flag, store_vote_summary
- 
- 
+from models import Base, Vote, Member, MemberVote, Category, VoteFlag
+from database import store_vote, store_member, store_member_vote, store_category, store_vote_flag, store_vote_summary
+
+
+# Helpers
+
 def make_vote(engine):
-    """Helper: inserts a minimal valid Vote row and returns its vote_id."""
-    metadata = {
-        "congress": 118,
-        "session": 1,
-        "roll_call_number": 42,
-        "legislation_number": "HR 1234",
-        "legislation_type": "HR",
-        "result": "Passed",
-        "date": date(2024, 1, 15),
-    }
+    """Inserts a minimal valid Vote row and returns its vote_id."""
     with Session(engine) as session:
-        vote = Vote(**{k: v for k, v in metadata.items()})
+        vote = Vote(
+            congress=118,
+            session=1,
+            roll_call_number=42,
+            legislation_number="HR 1234",
+            legislation_type="HR",
+            result="Passed",
+            date=date(2024, 1, 15),
+        )
         session.add(vote)
         session.commit()
         return vote.vote_id
- 
- 
-class TestStoreCategory(unittest.TestCase):
- 
+
+
+def make_member(engine, member_id="A000001"):
+    """Inserts a minimal valid Member row and returns its member_id."""
+    with Session(engine) as session:
+        member = Member(
+            member_id=member_id,
+            name="Smith, John",
+            state="CA",
+            chamber="House",
+        )
+        session.add(member)
+        session.commit()
+        return member.member_id
+
+
+# Tests
+
+class TestStoreVote(unittest.TestCase):
+
+    def setUp(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+
+    def test_store_vote_inserts_row(self):
+        """Verifies store_vote() inserts a single row into votes with correct values."""
+        metadata = {
+            "congress": 118,
+            "session": 1,
+            "roll_call_number": 42,
+            "legislation_number": "HR 1234",
+            "legislation_type": "HR",
+            "result": "Passed",
+            "date": date(2024, 1, 15),
+        }
+        store_vote(metadata, engine=self.engine)
+        with Session(self.engine) as session:
+            result = session.query(Vote).first()
+        self.assertEqual(result.congress, 118)
+        self.assertEqual(result.legislation_number, "HR 1234")
+        self.assertEqual(result.result, "Passed")
+
+    def test_store_vote_filters_extra_keys(self):
+        """Verifies store_vote() ignores keys not in VOTE_FIELDS."""
+        metadata = {
+            "congress": 118,
+            "session": 1,
+            "roll_call_number": 1,
+            "legislation_number": "HR 1",
+            "legislation_type": "HR",
+            "result": "Passed",
+            "date": date(2024, 1, 15),
+            "extra_field": "should be ignored",
+        }
+        store_vote(metadata, engine=self.engine)
+        with Session(self.engine) as session:
+            result = session.query(Vote).first()
+        self.assertIsNotNone(result)
+
+    def test_store_vote_multiple_rows(self):
+        """Verifies store_vote() can insert multiple votes."""
+        for i in range(3):
+            store_vote({
+                "congress": 118,
+                "session": 1,
+                "roll_call_number": i,
+                "legislation_number": f"HR {i}",
+                "legislation_type": "HR",
+                "result": "Passed",
+                "date": date(2024, 1, 15),
+            }, engine=self.engine)
+        with Session(self.engine) as session:
+            count = session.query(Vote).count()
+        self.assertEqual(count, 3)
+
+    def test_store_vote_nullable_fields_accepted(self):
+        """Verifies store_vote() succeeds when optional fields are absent."""
+        store_vote({
+            "congress": 118,
+            "session": 1,
+            "legislation_type": "HR",
+            "result": "Passed",
+        }, engine=self.engine)
+        with Session(self.engine) as session:
+            result = session.query(Vote).first()
+        self.assertIsNone(result.legislation_number)
+
+
+class TestStoreMember(unittest.TestCase):
+
+    def setUp(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+
+    def test_store_member_inserts_row(self):
+        """Verifies store_member() inserts a single row into members with correct values."""
+        store_member(
+            member_id="A000001",
+            name="Smith, John",
+            state="CA",
+            district=12,
+            party="Democrat",
+            chamber="House",
+            picture_url="https://example.com/photo.jpg",
+            photo_cred=None,
+            committees=None,
+            authored_leg=None,
+            co_authored_leg=None,
+            engine=self.engine,
+        )
+        with Session(self.engine) as session:
+            result = session.get(Member, "A000001")
+        self.assertEqual(result.name, "Smith, John")
+        self.assertEqual(result.state, "CA")
+        self.assertEqual(result.district, 12)
+
+    def test_store_member_null_district_for_senator(self):
+        """Verifies store_member() accepts null district for senators."""
+        store_member(
+            member_id="B000001",
+            name="Jones, Mary",
+            state="TX",
+            district=None,
+            party="Republican",
+            chamber="Senate",
+            picture_url=None,
+            photo_cred=None,
+            committees=None,
+            authored_leg=None,
+            co_authored_leg=None,
+            engine=self.engine,
+        )
+        with Session(self.engine) as session:
+            result = session.get(Member, "B000001")
+        self.assertIsNone(result.district)
+        self.assertEqual(result.chamber, "Senate")
+
+    def test_store_member_nullable_fields_accepted(self):
+        """Verifies store_member() succeeds when all optional fields are None."""
+        store_member(
+            member_id="C000001",
+            name="Lee, Alex",
+            state="NY",
+            district=None,
+            party=None,
+            chamber="House",
+            picture_url=None,
+            photo_cred=None,
+            committees=None,
+            authored_leg=None,
+            co_authored_leg=None,
+            engine=self.engine,
+        )
+        with Session(self.engine) as session:
+            result = session.get(Member, "C000001")
+        self.assertIsNotNone(result)
+
+    def test_store_member_multiple_rows(self):
+        """Verifies store_member() can insert multiple members."""
+        for i in range(3):
+            store_member(
+                member_id=f"D00000{i}",
+                name=f"Rep {i}",
+                state="CA",
+                district=i,
+                party="Democrat",
+                chamber="House",
+                picture_url=None,
+                photo_cred=None,
+                committees=None,
+                authored_leg=None,
+                co_authored_leg=None,
+                engine=self.engine,
+            )
+        with Session(self.engine) as session:
+            count = session.query(Member).count()
+        self.assertEqual(count, 3)
+
+
+class TestStoreMemberVote(unittest.TestCase):
+
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.vote_id = make_vote(self.engine)
- 
-    def tearDown(self):
+        self.member_id = make_member(self.engine)
+
+    def test_store_member_vote_inserts_row(self):
+        """Verifies store_member_vote() inserts a single row with correct values."""
+        store_member_vote(
+            member_id=self.member_id,
+            vote_id=self.vote_id,
+            position="Yea",
+            engine=self.engine,
+        )
         with Session(self.engine) as session:
-            session.close()
- 
+            result = session.query(MemberVote).first()
+        self.assertEqual(result.member_id, self.member_id)
+        self.assertEqual(result.vote_id, self.vote_id)
+        self.assertEqual(result.position, "Yea")
+
+    def test_store_member_vote_all_positions(self):
+        """Verifies store_member_vote() correctly stores Yea, Nay, and Not Voting positions."""
+        for i, position in enumerate(["Yea", "Nay", "Not Voting"]):
+            member_id = make_member(self.engine, member_id=f"X00000{i}")
+            store_member_vote(
+                member_id=member_id,
+                vote_id=self.vote_id,
+                position=position,
+                engine=self.engine,
+            )
+        with Session(self.engine) as session:
+            results = session.query(MemberVote).all()
+        positions = [r.position for r in results]
+        self.assertIn("Yea", positions)
+        self.assertIn("Nay", positions)
+        self.assertIn("Not Voting", positions)
+
+    def test_store_member_vote_multiple_rows(self):
+        """Verifies store_member_vote() can insert multiple member votes for the same vote."""
+        for i in range(3):
+            member_id = make_member(self.engine, member_id=f"Y00000{i}")
+            store_member_vote(
+                member_id=member_id,
+                vote_id=self.vote_id,
+                position="Yea",
+                engine=self.engine,
+            )
+        with Session(self.engine) as session:
+            count = session.query(MemberVote).count()
+        self.assertEqual(count, 3)
+
+
+class TestStoreCategory(unittest.TestCase):
+
+    def setUp(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.vote_id = make_vote(self.engine)
+
     def test_store_category_inserts_row(self):
         """Verifies store_category() inserts a single row into vote_categories with correct values."""
         store_category(
@@ -50,7 +278,7 @@ class TestStoreCategory(unittest.TestCase):
         self.assertEqual(result.category, "Healthcare")
         self.assertEqual(result.direction, True)
         self.assertEqual(result.flagged, False)
- 
+
     def test_store_category_flagged_true(self):
         """Verifies store_category() correctly stores flagged=True for a flagged category."""
         store_category(
@@ -63,7 +291,7 @@ class TestStoreCategory(unittest.TestCase):
         with Session(self.engine) as session:
             result = session.query(Category).first()
         self.assertTrue(result.flagged)
- 
+
     def test_store_category_multiple_rows(self):
         """Verifies store_category() can insert multiple categories for the same vote_id."""
         categories = [
@@ -82,7 +310,7 @@ class TestStoreCategory(unittest.TestCase):
         with Session(self.engine) as session:
             results = session.query(Category).all()
         self.assertEqual(len(results), 3)
- 
+
     def test_store_category_correct_vote_id(self):
         """Verifies store_category() associates the category with the correct vote_id."""
         store_category(
@@ -95,19 +323,15 @@ class TestStoreCategory(unittest.TestCase):
         with Session(self.engine) as session:
             result = session.query(Category).first()
         self.assertEqual(result.vote_id, self.vote_id)
- 
- 
+
+
 class TestStoreVoteFlag(unittest.TestCase):
- 
+
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.vote_id = make_vote(self.engine)
- 
-    def tearDown(self):
-        with Session(self.engine) as session:
-            session.close()
- 
+
     def test_store_vote_flag_inserts_row(self):
         """Verifies store_vote_flag() inserts a single row into vote_flags with correct values."""
         store_vote_flag(
@@ -123,7 +347,7 @@ class TestStoreVoteFlag(unittest.TestCase):
         self.assertEqual(result.flag_name, "misleading_title")
         self.assertEqual(result.severity, "red")
         self.assertIn("title", result.explanation)
- 
+
     def test_store_vote_flag_all_severities(self):
         """Verifies store_vote_flag() correctly stores each severity tier: red, caution, informational."""
         flags = [
@@ -145,7 +369,7 @@ class TestStoreVoteFlag(unittest.TestCase):
         self.assertIn("red", severities)
         self.assertIn("caution", severities)
         self.assertIn("informational", severities)
- 
+
     def test_store_vote_flag_multiple_flags_same_vote(self):
         """Verifies store_vote_flag() can insert multiple flags for the same vote_id."""
         for i in range(3):
@@ -159,7 +383,7 @@ class TestStoreVoteFlag(unittest.TestCase):
         with Session(self.engine) as session:
             results = session.query(VoteFlag).all()
         self.assertEqual(len(results), 3)
- 
+
     def test_store_vote_flag_null_explanation(self):
         """Verifies store_vote_flag() accepts a null explanation without error."""
         store_vote_flag(
@@ -172,19 +396,15 @@ class TestStoreVoteFlag(unittest.TestCase):
         with Session(self.engine) as session:
             result = session.query(VoteFlag).first()
         self.assertIsNone(result.explanation)
- 
- 
+
+
 class TestStoreVoteSummary(unittest.TestCase):
- 
+
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.vote_id = make_vote(self.engine)
- 
-    def tearDown(self):
-        with Session(self.engine) as session:
-            session.close()
- 
+
     def test_store_vote_summary_updates_row(self):
         """Verifies store_vote_summary() updates summary and chunk_count on an existing vote row."""
         store_vote_summary(
@@ -197,7 +417,7 @@ class TestStoreVoteSummary(unittest.TestCase):
             result = session.get(Vote, self.vote_id)
         self.assertEqual(result.summary, "This bill expands healthcare access for low-income families.")
         self.assertEqual(result.chunk_count, 3)
- 
+
     def test_store_vote_summary_does_not_create_new_row(self):
         """Verifies store_vote_summary() updates in place and does not insert a new row."""
         store_vote_summary(
@@ -209,7 +429,7 @@ class TestStoreVoteSummary(unittest.TestCase):
         with Session(self.engine) as session:
             count = session.query(Vote).count()
         self.assertEqual(count, 1)
- 
+
     def test_store_vote_summary_overwrites_existing(self):
         """Verifies store_vote_summary() overwrites a previously stored summary."""
         store_vote_summary(
@@ -228,7 +448,7 @@ class TestStoreVoteSummary(unittest.TestCase):
             result = session.get(Vote, self.vote_id)
         self.assertEqual(result.summary, "Updated summary.")
         self.assertEqual(result.chunk_count, 2)
- 
+
     def test_store_vote_summary_other_fields_unchanged(self):
         """Verifies store_vote_summary() does not modify other fields on the vote row."""
         store_vote_summary(
@@ -242,7 +462,7 @@ class TestStoreVoteSummary(unittest.TestCase):
         self.assertEqual(result.congress, 118)
         self.assertEqual(result.legislation_type, "HR")
         self.assertEqual(result.result, "Passed")
- 
- 
+
+
 if __name__ == "__main__":
     unittest.main()

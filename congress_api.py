@@ -452,6 +452,7 @@ def get_all_members(api_key, congress):
                 if "endYear" not in item.keys():
                     member_dict["chamber"] = item["chamber"]
 
+            member_dict["district"] = member["district"]
             member_dict["picture_url"] = member.get("depiction", {}).get("imageUrl")
             member_dict["photo_cred"] = member.get("depiction", {}).get("attribution")
 

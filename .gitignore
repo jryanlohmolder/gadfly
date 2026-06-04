@@ -2,3 +2,5 @@
 pyrightconfig.json
 __pycache__
 .pytest_cache
+*.pyc
+congress_voting_data.db

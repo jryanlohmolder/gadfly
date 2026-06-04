@@ -58,6 +58,11 @@ PARSE_BILL_PROMPT = (
     '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
+    '        "subordinates_us_interests": {\n'
+    '            "severity": "caution",\n'
+    '            "present": true | false,\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '        },\n'
     '        "internal_contradiction": {\n'
     '            "severity": "informational",\n'
     '            "present": true | false,\n'
@@ -113,14 +118,19 @@ PARSE_BILL_PROMPT = (
     '        "Foreign Policy, War & National Security": {\n'
     '            "direction": "Diplomatic / reduce military spending" | "Military expansion / increase defense spending" | "Not present" | "Internal contradiction",\n'
     '            "flagged": true | false\n'
+    '        },\n'
+    '        "National Interest & Foreign Influence": {\n'
+    '            "direction": "Prioritizes US interests" | "Subordinates US interests to foreign interests" | "Not present" | "Internal contradiction",\n'
+    '            "flagged": true | false\n'
     '        }\n'
     '    },\n'
     '    "summary": "Plain language summary of what the bill actually does. Write as long as the bill requires — a simple bill may need one sentence, a complex bill may need a paragraph. Describe only what the bill mechanically changes: what it adds, removes, restricts, allocates, or requires. Do not characterize intent or likely impact."\n'
     "}\n\n"
     "Category flagging rules:\n"
-    "- All 11 categories: flagged if the bill pulls in both directions within that category (internal contradiction).\n"
+    "- All 12 categories: flagged if the bill pulls in both directions within that category (internal contradiction).\n"
     "- 'Corruption & Government Accountability': also flagged if direction is 'Reduce oversight / accountability'.\n"
-    "- 'Individual Rights & Civil Liberties': also flagged if direction is 'Restrict rights / increase restrictions'.\n\n"
+    "- 'Individual Rights & Civil Liberties': also flagged if direction is 'Restrict rights / increase restrictions'.\n"
+    "- 'National Interest & Foreign Influence': also flagged if direction is 'Subordinates US interests to foreign interests'.\n\n"
     "Bill-level flag rules (independent of categories):\n"
     "- internal_contradiction: flag if the bill pulls in both directions within any single category.\n"
     "- obfuscation_by_verbosity: flag if BOTH of the following are true: (a) the plain language summary of what this bill does can be stated in 1-2 sentences, AND (b) the bill uses heavy legal jargon, excessive cross-references, or repetitive language that a non-lawyer could not reasonably parse.\n"
@@ -129,7 +139,8 @@ PARSE_BILL_PROMPT = (
     "- sunset_clauses: flag if provisions expire after a defined period without clear plain language notice.\n"
     "- misleading_title: flag if the bill's title does not accurately represent its content.\n"
     "- corruption_or_reduced_oversight: flag if the bill removes, weakens, or limits any existing mechanism for government accountability or oversight. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n"
-    "- restricts_individual_rights: flag if the bill removes, limits, or adds new restrictions on rights or liberties currently held by individuals. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n\n"
+    "- restricts_individual_rights: flag if the bill removes, limits, or adds new restrictions on rights or liberties currently held by individuals. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n"
+    "- subordinates_us_interests: flag if the bill grants, transfers, or defers any authority, resource, or legal obligation to a foreign government, international body, or foreign-controlled entity in a way that limits US autonomy or prioritizes foreign interests over domestic ones. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n\n"
     "BILL TEXT:\n"
 )
 
