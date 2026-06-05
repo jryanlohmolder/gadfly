@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from models import Vote, MemberVote, Category, VoteFlag, Member, Base
+from models import Vote, MemberVote, Category, VoteFlag, Member, Base, SponsoredLegislation, CosponsoredLegislation
 
 
 # Constants
@@ -177,4 +177,49 @@ def store_member(member_id, name, state, district, party, chamber, picture_url, 
         new_member = Member(member_id=member_id, name=name, state=state, district=district, party=party, chamber=chamber, picture_url=picture_url, photo_cred=photo_cred, committees=committees, authored_leg=authored_leg, co_authored_leg=co_authored_leg)
         session.add(new_member)
         session.commit()
-        
+
+def store_sponsored_legislation(member_id, legislation_number, legislation_type, policy_area, engine=None):
+    """
+    Inserts a sponsored legislation record into the sponsored_legislation table.
+    Args:
+        member_id (str): Foreign key referencing the members table.
+        legislation_number (str): Bill identifier (e.g. '508').
+        legislation_type (str): Type of legislation (e.g. 'HR', 'S').
+        policy_area (str): Policy area of the legislation (e.g. 'Environmental Protection'). May be None.
+    Raises:
+        sqlalchemy.exc.SQLAlchemyError: If the insert or commit fails.
+    """
+    if engine is None:
+        engine = get_engine()
+    with Session(engine) as session:
+        new_bill = SponsoredLegislation(
+            member_id=member_id,
+            legislation_number=legislation_number,
+            legislation_type=legislation_type,
+            policy_area=policy_area,
+        )
+        session.add(new_bill)
+        session.commit()
+ 
+def store_cosponsored_legislation(member_id, legislation_number, legislation_type, policy_area, engine=None):
+    """
+    Inserts a cosponsored legislation record into the cosponsored_legislation table.
+    Args:
+        member_id (str): Foreign key referencing the members table.
+        legislation_number (str): Bill identifier (e.g. '1234').
+        legislation_type (str): Type of legislation (e.g. 'HR', 'S').
+        policy_area (str): Policy area of the legislation (e.g. 'Health'). May be None.
+    Raises:
+        sqlalchemy.exc.SQLAlchemyError: If the insert or commit fails.
+    """
+    if engine is None:
+        engine = get_engine()
+    with Session(engine) as session:
+        new_bill = CosponsoredLegislation(
+            member_id=member_id,
+            legislation_number=legislation_number,
+            legislation_type=legislation_type,
+            policy_area=policy_area,
+        )
+        session.add(new_bill)
+        session.commit()

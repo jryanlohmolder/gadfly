@@ -452,7 +452,7 @@ def get_all_members(api_key, congress):
                 if "endYear" not in item.keys():
                     member_dict["chamber"] = item["chamber"]
 
-            member_dict["district"] = member["district"]
+            member_dict["district"] = member.get("district")
             member_dict["picture_url"] = member.get("depiction", {}).get("imageUrl")
             member_dict["photo_cred"] = member.get("depiction", {}).get("attribution")
 
@@ -467,6 +467,166 @@ def get_all_members(api_key, congress):
             url = None
     
     return representatives
+
+def get_sponsored_leg(api_key, member_id):
+    """
+    Fetch all sponsored legislation for a member of congress to populate SponsoredLegislation database.
+    
+    Args:
+        api_key (str): Congress API authentication key.
+        member_id (str): Member's bioguide ID (e.g., 'W000779').
+    
+    Returns:
+        list[dict]: A list of dicts, each containing a legislation number and policy area.
+    
+    Raises:
+        requests.exceptions.HTTPError: If a non-429 HTTP error is returned.
+        requests.exceptions.RequestException: If a network error occurs.
+        requests.exceptions.RetryError: If run_cap number is reached.
+    """
+
+    # Empty List of Sponsored Legislation
+    sponsored_bills = []
+
+    # URL
+    url = f"https://api.congress.gov/v3/member/{member_id}/sponsored-legislation?api_key={api_key}&limit=20"
+
+    run_cap = 5
+    
+    while url:
+        # Initialize count
+        count = 0
+
+        while count < run_cap:
+            try:
+                # Make API call
+                response = requests.get(url)
+
+                # If 429 error received 
+                if response.status_code == 429:
+                    # Call exponential backoff
+                    exponential_backoff(count)
+                    # Enumerate count
+                    count += 1
+
+                    # If count equals run_cap
+                    if count == run_cap:
+                        raise requests.exceptions.RetryError("Max retries exceeded for get_sponsored_leg")
+                    continue
+
+                # Check for other HTTP Errors
+                response.raise_for_status()
+
+                # Extract legislation
+                data = response.json()
+                leg = data["sponsoredLegislation"]
+                break
+            
+            except requests.exceptions.RequestException as e:
+                print(f"Network error: {e}")
+                raise
+
+        # Loop of legislation
+        for bill in leg:
+            sponsored_leg = {}
+
+            # Verify if policy type is in LEGISLATION_TYPES
+            if bill["type"] in LEGISLATION_TYPES:
+                # Extract legislation number and policy area
+                sponsored_leg["legislation_number"] = bill["number"]
+                sponsored_leg["policy_area"] = bill.get("policyArea", {}).get("name")
+                sponsored_leg["type"] = bill["type"]
+                
+                # Add dict to sponsored legislation
+                sponsored_bills.append(sponsored_leg)
+
+        # Set url pagination to next or None
+        if data["pagination"]["next"]:
+            url = data["pagination"]["next"] + "&api_key=" + api_key
+        else:
+            url = None
+            
+    return sponsored_bills
+
+def get_cosponsored_leg(api_key, member_id):
+    """
+    Fetch all cosponsored legislation for a member of congress to populate CosponsoredLegislation database.
+    
+    Args:
+        api_key (str): Congress API authentication key.
+        member_id (str): Member's bioguide ID (e.g., 'W000779').
+    
+    Returns:
+        list[dict]: A list of dicts, each containing a legislation number and policy area.
+    
+    Raises:
+        requests.exceptions.HTTPError: If a non-429 HTTP error is returned.
+        requests.exceptions.RequestException: If a network error occurs.
+        requests.exceptions.RetryError: If run_cap number is reached.
+    """
+
+    # Empty List of Sponsored Legislation
+    cosponsored_bills = []
+
+    # URL
+    url = f"https://api.congress.gov/v3/member/{member_id}/cosponsored-legislation?api_key={api_key}&limit=20"
+
+    run_cap = 5
+    
+    while url:
+        # Initialize count
+        count = 0
+
+        while count < run_cap:
+            try:
+                # Make API call
+                response = requests.get(url)
+
+                # If 429 error received 
+                if response.status_code == 429:
+                    # Call exponential backoff
+                    exponential_backoff(count)
+                    # Enumerate count
+                    count += 1
+
+                    # If count equals run_cap
+                    if count == run_cap:
+                        raise requests.exceptions.RetryError("Max retries exceeded for get_cosponsored_leg")
+                    continue
+
+                # Check for other HTTP Errors
+                response.raise_for_status()
+
+                # Extract legislation
+                data = response.json()
+                leg = data["cosponsoredLegislation"]
+                break
+            
+            except requests.exceptions.RequestException as e:
+                print(f"Network error: {e}")
+                raise
+
+        # Loop of legislation
+        for bill in leg:
+            cosponsored_leg = {}
+
+            # Verify if policy type is in LEGISLATION_TYPES
+            if bill["type"] in LEGISLATION_TYPES:
+                # Extract legislation number and policy area
+                cosponsored_leg["legislation_number"] = bill["number"]
+                cosponsored_leg["policy_area"] = bill.get("policyArea", {}).get("name")
+                cosponsored_leg["type"] = bill["type"]
+                
+                # Add dict to sponsored legislation
+                cosponsored_bills.append(cosponsored_leg)
+
+        # Set url pagination to next or None
+        if data["pagination"]["next"]:
+            url = data["pagination"]["next"] + "&api_key=" + api_key
+        else:
+            url = None
+            
+    return cosponsored_bills
 
 def exponential_backoff(count):
     """

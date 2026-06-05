@@ -116,3 +116,40 @@ class VoteFlag(Base):
     flag_name = Column(Text)
     severity = Column(Text)
     explanation = Column(Text)
+
+class SponsoredLegislation(Base):
+    """
+    Represents a single instance of a representative sponsoring a bill
+
+    Attributes:
+        member_id (str): Taken from the members table
+        legislation_number (str): Bill identifier (e.g. 'HR 1234').
+        legislation_type (str): Type of legislation (e.g. 'HR', 'S').
+        policy_area (str): Policy area of the legislation (e.g. 'Environmental Protection'). May be None.
+    """
+
+    __tablename__ = "sponsored_legislation"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    member_id = Column(String, ForeignKey("members.member_id"), nullable=False)
+    legislation_number = Column(String, nullable=False)
+    legislation_type = Column(Text, nullable=False)
+    policy_area = Column(Text)
+
+
+class CosponsoredLegislation(Base):
+    """
+    Represents a single instance of a representative cosponsoring a bill
+
+    Attributes:
+        member_id (str): Taken from the members table
+        legislation_number (str): Bill identifier (e.g. 'HR 1234').
+        legislation_type (str): Type of legislation (e.g. 'HR', 'S').
+        policy_area (str): Policy area of the legislation (e.g. 'Environmental Protection'). May be None.
+    """
+
+    __tablename__ = "cosponsored_legislation"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    member_id = Column(String, ForeignKey("members.member_id"), nullable=False)
+    legislation_number = Column(String, nullable=False)
+    legislation_type = Column(Text, nullable=False)
+    policy_area = Column(Text)
