@@ -20,20 +20,22 @@ All data is stored in SQLite. Fields are sourced from the Congress API unless no
 ### Members
 | Field | Source |
 |---|---|
-| `bioguideId` | Congress API |
+| `member_id` | Congress API (bioguideId) |
 | `name` | Congress API |
 | `state` | Congress API |
+| `district` | Congress API (null for senators) |
 | `party` | Congress API |
 | `chamber` | Congress API |
 | `picture_url` | Congress API |
+| `photo_cred` | Congress API |
 | `committees` | Congress API |
-| `legislation_authored` | Congress API |
-| `legislation_co_authored` | Congress API |
+| `authored_leg` | Congress API |
+| `co_authored_leg` | Congress API |
 
 ### Votes
 | Field | Source |
 |---|---|
-| `vote_id` | Generated |
+| `vote_id` | Generated (autoincrement) |
 | `congress` | Congress API |
 | `session` | Congress API |
 | `roll_call_number` | Congress API |
@@ -41,21 +43,47 @@ All data is stored in SQLite. Fields are sourced from the Congress API unless no
 | `legislation_type` | Congress API |
 | `result` | Congress API |
 | `date` | Congress API |
-| `description` | Generated via Claude API |
+| `summary` | Generated via Claude API |
+| `chunk_count` | Generated via Claude API |
 
 ### MemberVotes
 | Field | Source |
 |---|---|
-| `member_id` | bioguideId from Members |
+| `id` | Generated (autoincrement) |
+| `member_id` | Foreign key to Members |
 | `vote_id` | Foreign key to Votes |
-| `position` | Congress API (yea / nay) |
+| `position` | Congress API (yea / nay / not voting) |
 
 ### VoteCategories
 | Field | Source |
 |---|---|
+| `id` | Generated (autoincrement) |
 | `vote_id` | Foreign key to Votes |
 | `category` | Generated via Claude API |
 | `direction` | Generated via Claude API |
+| `flagged` | Generated via Claude API |
+
+### VoteFlags
+| Field | Source |
+|---|---|
+| `id` | Generated (autoincrement) |
+| `vote_id` | Foreign key to Votes |
+| `flag_name` | Generated via Claude API |
+| `severity` | Generated via Claude API |
+| `explanation` | Generated via Claude API |
+
+### Flags Reference
+| Flag | Severity | Triggers When |
+|---|---|---|
+| `corruption_or_reduced_oversight` | Red | Bill removes, weakens, or limits any existing mechanism for government accountability or oversight |
+| `restricts_individual_rights` | Red | Bill removes, limits, or adds new restrictions on rights or liberties currently held by individuals |
+| `misleading_title` | Red | Bill's title does not accurately represent its content |
+| `obfuscation_by_verbosity` | Red | Bill's substance can be stated in 1-2 sentences but is buried in excessive legal jargon |
+| `riders` | Caution | Unrelated provisions are attached to the bill |
+| `cross_referencing_obfuscation` | Caution | Bill relies heavily on references to other legislation without plain language explanation |
+| `subordinates_us_interests` | Caution | Bill grants, transfers, or defers authority or resources to a foreign government or international body in a way that limits US autonomy |
+| `internal_contradiction` | Informational | Bill pulls in both directions within a single category |
+| `sunset_clauses` | Informational | Provisions expire after a defined period without clear plain language notice |
 
 ---
 
@@ -76,6 +104,7 @@ Each vote is tagged with applicable categories from the following list. For each
 | 9 | **Social Programs & Safety Net** | Expand programs / benefits | Cut / reduce programs |
 | 10 | **Environment & Energy** | Expand protections / clean energy | Reduce protections / expand fossil fuels |
 | 11 | **Foreign Policy, War & National Security** | Diplomatic / reduce military spending | Military expansion / increase defense spending |
+| 12 | **National Interest & Foreign Influence** | Prioritizes US interests | Subordinates US interests to foreign interests |
 
 ---
 
@@ -107,7 +136,7 @@ Below the header, tabbed sections:
 
 | Tab | Contents |
 |---|---|
-| **Voting Profile** | 11 category bars showing directional lean (0 direction: *reduce oversight / accountability*
+| **Voting Profile** | 12 category bars showing directional lean (0 direction: *reduce oversight / accountability*
 - **Foreign Policy, War & National Security** direction: *restrict rights / increase restrictions*
 
 ---
