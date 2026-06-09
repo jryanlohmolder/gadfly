@@ -2,16 +2,17 @@ import unittest
 from unittest.mock import MagicMock, patch
 import requests
 
-from congress_api import get_total_votes, get_vote_data, check_legislation_type, get_vote_metadata, fetch_member_positions, fetch_bill_url, fetch_bill_text, get_all_members, get_sponsored_leg, get_cosponsored_leg
+from congress_api import get_all_votes, fetch_member_positions, fetch_bill_url, fetch_bill_text, get_all_members, get_sponsored_leg, get_cosponsored_leg
 
+from datetime import date
 
-class TestGetTotalVotes(unittest.TestCase):
+class TestGetAllVotes(unittest.TestCase):
+
     @patch("congress_api.requests.get")
-    def test_returns_correct_count(self, mock_get):
+    def test_returns_correct_votes(self, mock_get):
         """
-        Tests get_total_votes() in congress_api.py. Verifies the function
-        returns an integer greater than 0 and correctly extracts the count
-        from the mocked API response.
+        Tests get_all_votes() returns a list of dicts containing only votes
+        with legislation types in LEGISLATION_TYPES, with correct field mapping.
 
         Args:
             mock_get: Patched requests.get injected by @patch decorator.
@@ -19,69 +20,159 @@ class TestGetTotalVotes(unittest.TestCase):
 
         # Create an instance of mock HTTP call and set value
         mock_response = MagicMock()
-        mock_response.json.return_value = {"pagination": {"count": 500}}
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "houseRollCallVotes": [
+                {
+                    "congress": 119,
+                    "sessionNumber": 2,
+                    "rollCallNumber": 78,
+                    "legislationNumber": "4758",
+                    "legislationType": "HR",
+                    "result": "Passed",
+                    "startDate": "2026-02-25T10:40:00-05:00",
+                },
+                {
+                    "congress": 119,
+                    "sessionNumber": 2,
+                    "rollCallNumber": 79,
+                    "legislationNumber": "1234",
+                    "legislationType": "HCONRES",  # not in LEGISLATION_TYPES
+                    "result": "Failed",
+                    "startDate": "2026-02-25T11:00:00-05:00",
+                },
+            ],
+            "pagination": {"next": None},
+        }
 
         # Set the get call
         mock_get.return_value = mock_response
 
-        # fake HTTP call
-        n = get_total_votes("test_key", 119)
+        # Make the call
+        result = get_all_votes("test_key", 119)
 
         # Assertions
-        assert type(n) == int
-        assert n > 0
-        assert n == 500
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["congress"], 119)
+        self.assertEqual(result[0]["session"], 2)
+        self.assertEqual(result[0]["roll_call_number"], 78)
+        self.assertEqual(result[0]["legislation_number"], "4758")
+        self.assertEqual(result[0]["legislation_type"], "hr")
+        self.assertEqual(result[0]["result"], "Passed")
+        self.assertEqual(result[0]["date"], date(2026, 2, 25))
+
+    @patch("congress_api.requests.get")
+    def test_paginates_correctly(self, mock_get):
+        """
+        Tests get_all_votes() follows pagination and collects votes across
+        multiple pages.
+
+        Args:
+            mock_get: Patched requests.get injected by @patch decorator.
+        """
+
+        # Create mock responses for two pages
+        mock_page_1 = MagicMock()
+        mock_page_1.status_code = 200
+        mock_page_1.json.return_value = {
+            "houseRollCallVotes": [
+                {
+                    "congress": 119,
+                    "sessionNumber": 1,
+                    "rollCallNumber": 1,
+                    "legislationNumber": "100",
+                    "legislationType": "HR",
+                    "result": "Passed",
+                    "startDate": "2025-01-10T10:00:00-05:00",
+                }
+            ],
+            "pagination": {"next": "https://api.congress.gov/v3/house-vote/119?offset=20"},
+        }
+
+        mock_page_2 = MagicMock()
+        mock_page_2.status_code = 200
+        mock_page_2.json.return_value = {
+            "houseRollCallVotes": [
+                {
+                    "congress": 119,
+                    "sessionNumber": 1,
+                    "rollCallNumber": 2,
+                    "legislationNumber": "200",
+                    "legislationType": "S",
+                    "result": "Failed",
+                    "startDate": "2025-01-11T10:00:00-05:00",
+                }
+            ],
+            "pagination": {"next": None},
+        }
+
+        # Set the get call
+        mock_get.side_effect = [mock_page_1, mock_page_2]
+
+        # Make the call
+        result = get_all_votes("test_key", 119)
+
+        # Assertions
+        self.assertEqual(len(result), 2)
+        self.assertEqual(mock_get.call_count, 2)
+        self.assertEqual(result[0]["roll_call_number"], 1)
+        self.assertEqual(result[1]["roll_call_number"], 2)
 
     @patch("congress_api.exponential_backoff")
     @patch("congress_api.requests.get")
     def test_one_429_then_200(self, mock_get, mock_backoff):
         """
-        Tests get_total_votes() retries once on a 429 and succeeds on the subsequent 200.
+        Tests get_all_votes() retries once on a 429 and succeeds on the
+        subsequent 200.
 
         Args:
             mock_get: Patched requests.get injected by @patch decorator.
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: If result is not a int, result is not 500, or call_count is not 2.
+            mock_backoff: Patched exponential_backoff injected by @patch decorator.
         """
 
-        # Create mock call with 429 respone
+        # Create mock call with 429 response
         mock_429 = MagicMock()
         mock_429.status_code = 429
 
         # Create mock call with 200 response
         mock_200 = MagicMock()
         mock_200.status_code = 200
-
-        mock_200.json.return_value = {"pagination": {"count": 500}}
+        mock_200.json.return_value = {
+            "houseRollCallVotes": [
+                {
+                    "congress": 119,
+                    "sessionNumber": 1,
+                    "rollCallNumber": 1,
+                    "legislationNumber": "100",
+                    "legislationType": "HR",
+                    "result": "Passed",
+                    "startDate": "2025-01-10T10:00:00-05:00",
+                }
+            ],
+            "pagination": {"next": None},
+        }
 
         # Set the get call
         mock_get.side_effect = [mock_429, mock_200]
 
-        # Assertions
-        result = get_total_votes("test_key", 119)
+        # Make the call
+        result = get_all_votes("test_key", 119)
 
-        self.assertIsInstance(result, int)
-        self.assertEqual(result, 500)
+        # Assertions
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
         self.assertEqual(mock_get.call_count, 2)
 
     @patch("congress_api.exponential_backoff")
     @patch("congress_api.requests.get")
     def test_429_exhaustion(self, mock_get, mock_backoff):
         """
-        Tests get_total_votes() raises RetryError after 5 consecutive 429 responses.
+        Tests get_all_votes() raises RetryError after 5 consecutive 429 responses.
 
         Args:
             mock_get: Patched requests.get injected by @patch decorator.
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: If RetryError is not raised or call_count is not 5.
+            mock_backoff: Patched exponential_backoff injected by @patch decorator.
         """
 
         # Create mock call with 429 response
@@ -93,351 +184,84 @@ class TestGetTotalVotes(unittest.TestCase):
 
         # Assertions
         with self.assertRaises(requests.exceptions.RetryError):
-            get_total_votes("test_key", 118)
+            get_all_votes("test_key", 119)
         self.assertEqual(mock_get.call_count, 5)
 
     @patch("congress_api.requests.get")
     def test_non_429_http_error(self, mock_get):
         """
-        Tests get_total_votes() raises HTTPError immediately on a non-429 HTTP error.
+        Tests get_all_votes() raises HTTPError immediately on a non-429 HTTP error.
 
         Args:
             mock_get: Patched requests.get injected by @patch decorator.
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: If HTTPError is not raised or call_count is not 1.
         """
 
         # Create mock call with 403 response
         mock_403 = MagicMock()
         mock_403.status_code = 403
-
-        # Make mock response return HTTPError
         mock_403.raise_for_status.side_effect = requests.exceptions.HTTPError
 
-        # Set get call
+        # Set the get call
         mock_get.return_value = mock_403
 
         # Assertions
         with self.assertRaises(requests.exceptions.HTTPError):
-            get_total_votes("test_key", 118)
+            get_all_votes("test_key", 119)
         self.assertEqual(mock_get.call_count, 1)
 
     @patch("congress_api.requests.get")
     def test_connection_error(self, mock_get):
         """
-        Tests get_total_votes() raises RequestException immediately on a network error.
+        Tests get_all_votes() raises RequestException immediately on a network error.
 
         Args:
             mock_get: Patched requests.get injected by @patch decorator.
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: If RequestException is not raised or call_count is not 1.
         """
 
-        # Set get call
+        # Set the get call
         mock_get.side_effect = requests.exceptions.ConnectionError
 
         # Assertions
         with self.assertRaises(requests.exceptions.RequestException):
-            get_total_votes("test_key", 118)
+            get_all_votes("test_key", 119)
         self.assertEqual(mock_get.call_count, 1)
 
-
-class TestGetVoteData(unittest.TestCase):
     @patch("congress_api.requests.get")
-    def test_returns_flat_dict(self, mock_get):
+    def test_filters_out_irrelevant_legislation_types(self, mock_get):
         """
-        Tests get_vote_data() in congress_api.py. Verifies the function
-        returns a flat dict with correct snake_case keys, types, and values
-        extracted from the mocked API response.
+        Tests get_all_votes() returns an empty list when all votes have
+        legislation types not in LEGISLATION_TYPES.
 
         Args:
             mock_get: Patched requests.get injected by @patch decorator.
         """
 
-        # Create an instance of mock HTTP call and set value
+        # Create mock response with only irrelevant legislation types
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {
-            "vote": {
-                "congress": 118,
-                "session": 1,
-                "rollCallNumber": 42,
-                "result": "Passed",
-                "date": "2023-01-09",
-                "bill": {"number": "5", "type": "HR"}
-            }
+            "houseRollCallVotes": [
+                {
+                    "congress": 119,
+                    "sessionNumber": 1,
+                    "rollCallNumber": 5,
+                    "legislationNumber": "10",
+                    "legislationType": "HCONRES",
+                    "result": "Passed",
+                    "startDate": "2025-01-10T10:00:00-05:00",
+                }
+            ],
+            "pagination": {"next": None},
         }
 
         # Set the get call
         mock_get.return_value = mock_response
 
-        # fake HTTP call
-        result = get_vote_data("test_key", 118, 1, 42)
-
-        # Type assertions
-        self.assertIsInstance(result, dict)
-        self.assertIsInstance(result["congress"], int)
-        self.assertIsInstance(result["session"], int)
-        self.assertIsInstance(result["roll_call_number"], int)
-        self.assertIsInstance(result["legislation_number"], str)
-        self.assertIsInstance(result["legislation_type"], str)
-        self.assertIsInstance(result["result"], str)
-        self.assertIsInstance(result["date"], str)
-
-        # Value assertions
-        self.assertEqual(result["congress"], 118)
-        self.assertEqual(result["session"], 1)
-        self.assertEqual(result["roll_call_number"], 42)
-        self.assertEqual(result["legislation_number"], "5")
-        self.assertEqual(result["legislation_type"], "HR")
-        self.assertEqual(result["result"], "Passed")
-        self.assertEqual(result["date"], "2023-01-09")
-
-    @patch("congress_api.exponential_backoff")
-    @patch("congress_api.requests.get")
-    def test_one_429_then_200(self, mock_get, mock_backoff):
-        """
-        Tests get_vote_data() retries once on a 429 and succeeds on the subsequent 200.
-
-        Args:
-            mock_get: Patched requests.get injected by @patch decorator.
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: If result is not a int, result is not 500, or call_count is not 2.
-        """
-
-        # Create mock call with 429 response
-        mock_429 = MagicMock()
-        mock_429.status_code = 429
-
-        # Create mock call with 200 response
-        mock_200 = MagicMock()
-        mock_200.status_code = 200
-
-        mock_200.json.return_value = {
-            "vote": {
-                "congress": 118,
-                "session": 1,
-                "rollCallNumber": 42,
-                "result": "Passed",
-                "date": "2023-01-09",
-                "bill": {"number": "5", "type": "HR"}
-            }
-        }
-
-        mock_get.side_effect = [mock_429, mock_200]
-
-        # fake HTTP call
-        result = get_vote_data("test_key", 118, 1, 42)
+        # Make the call
+        result = get_all_votes("test_key", 119)
 
         # Assertions
-        self.assertIsInstance(result, dict)
-        self.assertIsInstance(result["congress"], int)
-        self.assertEqual(result["congress"], 118)
-        self.assertEqual(mock_get.call_count, 2)
-
-    @patch("congress_api.exponential_backoff")
-    @patch("congress_api.requests.get")
-    def test_429_exhaustion(self, mock_get, mock_backoff):
-        """
-        Tests get_vote_data() raises RetryError after 5 consecutive 429 responses.
-
-        Args:
-            mock_get: Patched requests.get injected by @patch decorator.
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: If RetryError is not raised or call_count is not 5.
-        """
-
-        # Create mock call with 429 response
-        mock_429 = MagicMock()
-        mock_429.status_code = 429
-
-        # Set the get call
-        mock_get.return_value = mock_429
-
-        # Assertions
-        with self.assertRaises(requests.exceptions.RetryError):
-            get_vote_data("test_key", 118, 1, 42)
-        self.assertEqual(mock_get.call_count, 5)
-
-    @patch("congress_api.requests.get")
-    def test_non_429_http_error(self, mock_get):
-        """
-        Tests get_vote_data() raises HTTPError immediately on a non-429 HTTP error.
-
-        Args:
-            mock_get: Patched requests.get injected by @patch decorator.
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: If HTTPError is not raised or call_count is not 1.
-        """
-
-        # Create mock response with 401 HTTP error
-        mock_401 = MagicMock()
-        mock_401.status_code = 401
-
-        # Have mock respones return an HTTP Error
-        mock_401.raise_for_status.side_effect = requests.exceptions.HTTPError
-
-        # Set mock call
-        mock_get.return_value = mock_401
-
-        # Assertions
-        with self.assertRaises(requests.exceptions.HTTPError):
-            get_vote_data("test_key", 118, 1, 42)
-        self.assertEqual(mock_get.call_count, 1)
-
-    @patch("congress_api.requests.get")
-    def test_connection_error(self, mock_get):
-        """
-        Tests get_vote_data() raises RequestException immediately on a network error.
-
-        Args:
-            mock_get: Patched requests.get injected by @patch decorator.
-
-        Returns:
-            None
-
-        Raises:
-            AssertionError: If RequestException is not raised or call_count is not 1.
-        """
-
-        # Set get call
-        mock_get.side_effect = requests.exceptions.ConnectionError
-
-        # Assertions
-        with self.assertRaises(requests.exceptions.RequestException):
-            get_vote_data("test_key", 118, 1, 42)
-        self.assertEqual(mock_get.call_count, 1)
-
-
-
-class TestCheckLegislationType(unittest.TestCase):
-    def test_valid_type(self):
-        """
-        Tests check_legislation_type() in congress_api. Verifies the function
-        returns True when legislation_type is in LEGISLATION_TYPES
-        """
-
-        # Create fake vote
-        fake_vote = {"legislation_type": "HR"}
-        # Pass to check_legislation_type
-        result = check_legislation_type(fake_vote)
-
-        self.assertTrue(result)
-
-    def test_invalid_type(self):
-        """
-        Tests check_legislation_type() in congress_api. Verifies the function
-        returns False when legislation_type is not in LEGISLATION_TYPES
-        """
-
-        # Create fake vote
-        fake_vote = {"legislation_type": "Not_valid"}
-        # Pass to check_legislation_type
-        result = check_legislation_type(fake_vote)
-
-        self.assertFalse(result)
-
-    def test_missing_type(self):
-        """
-        Tests check_legislation_type() in congress_api. Verifies the function
-        returns False when legislation_type is not present in dict
-        """
-
-        # Create fake vote
-        fake_vote = {"not_legislaiton_type": "HR"}
-        # Pass to check_legislation_type
-        result = check_legislation_type(fake_vote)
-
-        self.assertFalse(result)
-
-class TestGetVoteMetadata(unittest.TestCase):
-    def test_valid_result_type(self):
-        """ 
-        Tests get_vote_metadata() in congress_api. Verifies the function
-        returns the exact same dict when the keys match.
-        """
-
-        # Create dict from get_vote_meta_data
-        meta_data = {
-                "congress": 118,
-                "session": 1,
-                "roll_call_number": 42,
-                "legislation_number": "5",
-                "legislation_type": "HR",
-                "result": "Passed",
-                "date": "2023-01-09",
-            }
-        
-        result = get_vote_metadata(meta_data)
-
-        assert set(result.keys()) == {
-            "congress", 
-            "session", 
-            "roll_call_number",
-            "legislation_number",
-            "legislation_type",
-            "result",
-            "date", 
-        }
-
-    def test_extra_result_type(self):
-        """ 
-        Tests get_vote_metadata() in congress_api. Verifies the function
-        returns the appropriate keys and leaves out the extras.
-        """
-         
-        meta_data = {
-                "extra_one": 2,
-                "congress": 118,
-                "session": 1,
-                "roll_call_number": 42,
-                "legislation_number": "5",
-                "extra_two": "extra",
-                "legislation_type": "HR",
-                "result": "Passed",
-                "date": "2023-01-09",
-                "extra_three": "extra",
-            }
-        
-        result = get_vote_metadata(meta_data)
-    
-        assert set(result.keys()) == {
-            "congress", 
-            "session", 
-            "roll_call_number",
-            "legislation_number",
-            "legislation_type",
-            "result",
-            "date", 
-        }
-
-    def test_invalid_return_type(self):
-        """
-        Tests get_vote_metadata() in crongress_api.py. Verifies the function
-        returns a KeyError when all keys are not present.
-        """
-
-        with self.assertRaises(KeyError):
-            get_vote_metadata({"congress": 118})
+        self.assertEqual(result, [])
 
 
 class TestFetchMemberPositions(unittest.TestCase):
@@ -456,9 +280,9 @@ class TestFetchMemberPositions(unittest.TestCase):
         mock_response.json.return_value = {
             "houseRollCallVoteMemberVotes": {"results": 
                 [
-                    {"firstName": "John", "lastName": "Smith", "voteCast": "Aye"},
-                    {"firstName": "Jane", "lastName": "Doe", "voteCast": "No"},
-                    {"firstName": "King", "lastName": "Billy", "voteCast": "Aye"},
+                    {"bioguideID": "W0001456", "voteCast": "Aye"},
+                    {"bioguideID": "B0000757", "voteCast": "No"},
+                    {"bioguideID": "P0051484", "voteCast": "Aye"},
                 ]
             }
         }
@@ -472,7 +296,7 @@ class TestFetchMemberPositions(unittest.TestCase):
         # Assertions
         self.assertIsInstance(result, list)
         self.assertIsInstance(result[0], dict)
-        self.assertIn(result[1]["voteCast"], {"Aye", "No"})
+        self.assertIn(result[1]["position"], {"Aye", "No"})
 
     @patch("congress_api.exponential_backoff")
     @patch("congress_api.requests.get")
@@ -499,11 +323,13 @@ class TestFetchMemberPositions(unittest.TestCase):
         mock_200.status_code = 200
         
         mock_200.json.return_value = {
-        "houseRollCallVoteMemberVotes": {"results": [
-            {"firstName": "John", "lastName": "Smith", "voteCast": "Aye"},
-            {"firstName": "Jane", "lastName": "Doe", "voteCast": "No"},
-            {"firstName": "King", "lastName": "Billy", "voteCast": "Aye"},
-        ]}
+            "houseRollCallVoteMemberVotes": {"results": 
+                [
+                    {"bioguideID": "W0001456", "voteCast": "Aye"},
+                    {"bioguideID": "B0000757", "voteCast": "No"},
+                    {"bioguideID": "P0051484", "voteCast": "Aye"},
+                ]
+            }
         }
         
         # Set the get call

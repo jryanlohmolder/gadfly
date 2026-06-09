@@ -41,7 +41,7 @@ def store_vote(metadata, engine=None):
             legislation_type, result, date.
 
     Returns:
-        None
+        vote_id from a new vote
 
     Raises:
         sqlalchemy.exc.SQLAlchemyError: If the insert or commit fails.
@@ -54,6 +54,9 @@ def store_vote(metadata, engine=None):
         new_vote = Vote(**filtered)
         session.add(new_vote)
         session.commit()
+        session.refresh(new_vote)
+
+    return new_vote.vote_id
 
 def store_member_vote(member_id, vote_id, position, engine=None):
     """
@@ -150,7 +153,7 @@ def store_vote_summary(vote_id, summary, chunk_count, engine=None):
         vote.chunk_count = chunk_count
         session.commit()
 
-def store_member(member_id, name, state, district, party, chamber, picture_url, photo_cred, committees, authored_leg, co_authored_leg, engine=None):
+def store_member(member_id, name, state, district, party, chamber, picture_url, photo_cred, engine=None):
     """
     Inserts a member of congress into the members table.
 
@@ -163,7 +166,6 @@ def store_member(member_id, name, state, district, party, chamber, picture_url, 
         chamber (text): House of Representatives or Senate
         picture_url (str): url link to an image of the representative
         photo_cred (text): Who the image is acreditted to
-        committees (text): A list of all committees the representative sits on
         authored_leg (text): Legislation the member authored
         co_authored_leg (text): Legislation the member co-authored
 
@@ -174,7 +176,7 @@ def store_member(member_id, name, state, district, party, chamber, picture_url, 
     if engine is None:
         engine = get_engine()
     with Session(engine) as session:
-        new_member = Member(member_id=member_id, name=name, state=state, district=district, party=party, chamber=chamber, picture_url=picture_url, photo_cred=photo_cred, committees=committees, authored_leg=authored_leg, co_authored_leg=co_authored_leg)
+        new_member = Member(member_id=member_id, name=name, state=state, district=district, party=party, chamber=chamber, picture_url=picture_url, photo_cred=photo_cred)
         session.add(new_member)
         session.commit()
 

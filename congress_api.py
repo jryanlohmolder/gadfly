@@ -11,189 +11,97 @@ load_dotenv()
 API_KEY = os.getenv("CONGRESS_API_KEY")
 LEGISLATION_TYPES = {"HR", "S", "HJRES", "SJRES"}
 
-
-def get_total_votes(api_key, congress):
+def get_all_votes(api_key, congress):
     """
-    Fetch the total number of House votes recorded for a given congress.
+    Fetch all House roll call votes for a given congress that are tied to
+    legislation types we care about (HR, S, HJRES, SJRES).
 
     Args:
         api_key (str): Congress API authentication key.
-        congress (int): Congress number (e.g., 118).
+        congress (int): Congress number (e.g., 119).
 
     Returns:
-        int: Total number of votes recorded for the given congress.
+        list[dict]: A list of dicts, each containing congress, session,
+            roll_call_number, legislation_number, legislation_type, result,
+            and date for a single vote.
 
     Raises:
         requests.exceptions.HTTPError: If a non-429 HTTP error is returned.
         requests.exceptions.RequestException: If a network error occurs.
         requests.exceptions.RetryError: If run_cap number is reached.
     """
-    
-    # Initialize Count
-    count = 0
-    run_cap = 5
 
     # Set url
     url = f"https://api.congress.gov/v3/house-vote/{congress}"
-    
-    while count < run_cap:
-        try:
-            # Build the request headers using api_key
-            headers = {"X-API-KEY": api_key}
-            params = {"limit": 1}
 
-            # Make a GET request to the house-vote endpoint with limit=1
-            # Just get the pagination metadata
-            response = requests.get(
-                url,
-                headers = headers,
-                params = params,
-            )
-
-            # If receive a 429
-            if response.status_code == 429:
-                # call back off function
-                exponential_backoff(count)
-                
-                # Increase count
-                count += 1
-
-                if count == run_cap:
-                    raise requests.exceptions.RetryError("Max retries exceeded for get_total_votes")
-                # Retry from top of the loop
-                continue
-            
-            
-            # Check for other http errors
-            response.raise_for_status()
-            # Extract the total count from the response
-            vote_count = response.json()["pagination"]["count"]
-
-            # Return the total as an integer
-            return vote_count
-        
-        except requests.exceptions.RequestException as e:
-            print(f"Network error: {e}")
-            raise
-
-def get_vote_data(api_key, congress, session, vote_number):
-    """
-    Fetch raw vote data for a single House vote from the Congress API.
-
-    Args:
-        api_key (str): Congress API authentication key.
-        congress (int): Congress number (e.g., 118).
-        session (int): Session number (1 or 2).
-        vote_number (int): Roll call vote number.
-
-    Returns:
-        dict: Raw vote data including congress, session, roll_call_number,
-              legislation_number, legislation_type, result, and date.
-
-    Raises:
-        requests.exceptions.HTTPError: If a non-429 HTTP error is returned.
-        requests.exceptions.RequestException: If a network error occurs.
-        requests.exceptions.RetryError: If run_cap number is reached.
-    """
-    
-    # Initialize Count
-    count = 0
+    # Set run cap
     run_cap = 5
 
-    # set url
-    url = f"https://api.congress.gov/v3/house-vote/{congress}/{session}/{vote_number}"
+    # Empty all votes list
+    all_votes = []
 
-    while count < run_cap:
-        try:
-            # Build request headers
-            headers = {"X-API-KEY": api_key}
+    while url:
+        # Initialize Count
+        count = 0
+    
+        while count < run_cap:
+            try:
+                # Build the request headers using api_key
+                headers = {"X-API-KEY": api_key}
 
-            # Make a GET request to the vote_number end point
-            response = requests.get(
-                url,
-                headers = headers
-            )
+                # Make a GET request to the house-vote endpoint with limit=1
+                # Just get the pagination metadata
+                response = requests.get(
+                    url,
+                    headers = headers,
+                )
 
-            # If receive a 429
-            if response.status_code == 429: 
-                # Call exponential backoff
-                exponential_backoff(count)
-                # Enumerate count  
-                count += 1
-
-                if count == run_cap:
-                    raise requests.exceptions.RetryError("Max retries exceeded for get_total_votes")
-                # Retry from top of the loop
-                continue
+                # If receive a 429
+                if response.status_code == 429:
+                    # call back off function
+                    exponential_backoff(count)
                     
-            # handle other http errors
-            response.raise_for_status()
+                    # Increase count
+                    count += 1
+
+                    if count == run_cap:
+                        raise requests.exceptions.RetryError("Max retries exceeded for get_total_votes")
+                    # Retry from top of the loop
+                    continue
+                
+                
+                # Check for other http errors
+                response.raise_for_status()
+
+                # Get all relevant votes
+                data = response.json()
+                votes = data["houseRollCallVotes"]
+                break
             
-            # set up base key
-            base_key = response.json()["vote"]
+            except requests.exceptions.RequestException as e:
+                print(f"Network error: {e}")
+                raise
 
-            # generate dicitonary holding vote_data
-            vote_data = {
-                "congress": base_key["congress"],
-                "session": base_key["session"],
-                "roll_call_number": base_key["rollCallNumber"],
-                "legislation_number": base_key["bill"]["number"],
-                "legislation_type": base_key["bill"]["type"],
-                "result": base_key["result"],
-                "date": base_key["date"],
-            }
+        for vote in votes:
+            if vote.get("legislationType") in LEGISLATION_TYPES:
+                relevant_vote = {}
+                relevant_vote["congress"] = congress
+                relevant_vote["session"] = vote["sessionNumber"]
+                relevant_vote["roll_call_number"] = vote["rollCallNumber"]
+                relevant_vote["legislation_number"] = vote["legislationNumber"]
+                relevant_vote["legislation_type"] = vote["legislationType"].lower()
+                relevant_vote["result"] = vote["result"]
+                relevant_vote["date"] = datetime.strptime(vote["startDate"], "%Y-%m-%dT%H:%M:%S%z").date()
 
-            return vote_data
+                all_votes.append(relevant_vote)
 
-        except requests.exceptions.RequestException as e:
-            print(f"Network error: {e}")
-            raise
-    
-def check_legislation_type(vote_data):
-    """ 
-    Check if a vote has a legislation_type we care about in set LEGISLATION_TYPES.
-    HR: House Resolution, S: Senate Bill, HJRES: House Joint Resolution, 
-    SJRES: Senate Joint Resolution
+        # Set url pagination to next or None
+        if data["pagination"]["next"]:
+            url = data["pagination"]["next"] + "&api_key=" + api_key
+        else:
+            url = None
 
-    Args:
-        vote_data (dict): Raw vote data including congress, session, roll_call_number,
-              legislation_number, legislation_type, result, and date.
-
-    Returns:
-        boolean: True if legislation_type in LEGISLATION_TYPES. False if 
-        legislation_type not in LEGISLATION_TYPES
-    """
-
-    # Get legislation type and verify if it is in LEGISLATION_TYPES
-    leg_type = vote_data.get("legislation_type")
-    return leg_type in LEGISLATION_TYPES
-
-def get_vote_metadata(vote_data):
-    """
-    Gets the meta data from get_vote_data() and sets it up for the Vote DB
-
-    Args:
-        vote_data (dict): Raw vote data including congress, session, 
-        roll_call_number, legislation_number, legislation_type, result, and date.
-
-    Return:
-        meta_data (dict): Vote meta data including congress, session, roll_call_number,
-        legislation_number, legislation_type, result, and date.  
-    """
-
-    # Alter date data to date formate
-    date = datetime.strptime(vote_data["date"], "%Y-%m-%d").date()
-    
-    # Ensure we only get key, value pairs wanted for Vote DB
-    return  {
-        "congress": vote_data["congress"],
-        "session": vote_data["session"],
-        "roll_call_number": vote_data["roll_call_number"],
-        "legislation_number": vote_data["legislation_number"],
-        "legislation_type": vote_data["legislation_type"],
-        "result": vote_data["result"],
-        "date": date,
-    } 
+    return all_votes
 
 def fetch_member_positions(api_key, congress, session, vote_number):
     """
@@ -249,10 +157,21 @@ def fetch_member_positions(api_key, congress, session, vote_number):
             # Check for other HTTP errors
             response.raise_for_status()
 
-            # Convert json data to dict
-            vote_data = response.json()
+            # Extract member vote data
+            data = response.json()["houseRollCallVoteMemberVotes"]["results"]
+            
+            # Create empty list of member votes
+            member_votes = []
 
-            return vote_data["houseRollCallVoteMemberVotes"]["results"]
+            for entry in data:
+                member_vote = {}
+                member_vote["member_id"] = entry["bioguideID"]
+                member_vote["position"] = entry["voteCast"]
+
+                # Add member position to member votes list
+                member_votes.append(member_vote)
+
+            return member_votes
 
 
         except requests.exceptions.RequestException as e:
@@ -372,6 +291,7 @@ def fetch_bill_text(bill_url):
             # Return bill text
             if not response.text or not response.text.strip():
                 raise ValueError(f"Empty response body from {bill_url}")
+            
             return response.text
 
         except requests.exceptions.RequestException as e:
@@ -445,6 +365,7 @@ def get_all_members(api_key, congress):
             member_dict["member_id"] = member["bioguideId"]
             member_dict["name"] = member["name"]
             member_dict["state"] = member["state"]
+            member_dict["district"] = member.get("district")
             member_dict["party"] = member["partyName"]
 
             # extract member's chamber
@@ -452,7 +373,6 @@ def get_all_members(api_key, congress):
                 if "endYear" not in item.keys():
                     member_dict["chamber"] = item["chamber"]
 
-            member_dict["district"] = member.get("district")
             member_dict["picture_url"] = member.get("depiction", {}).get("imageUrl")
             member_dict["photo_cred"] = member.get("depiction", {}).get("attribution")
 

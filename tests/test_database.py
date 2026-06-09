@@ -22,6 +22,7 @@ def make_vote(engine):
         )
         session.add(vote)
         session.commit()
+        session.refresh(vote)
         return vote.vote_id
 
 
@@ -64,6 +65,21 @@ class TestStoreVote(unittest.TestCase):
         self.assertEqual(result.congress, 118)
         self.assertEqual(result.legislation_number, "HR 1234")
         self.assertEqual(result.result, "Passed")
+
+    def test_store_vote_returns_id(self):
+        """Verifies store_vote() returns the auto-assigned vote_id of the inserted row."""
+        metadata = {
+            "congress": 118,
+            "session": 1,
+            "roll_call_number": 42,
+            "legislation_number": "HR 1234",
+            "legislation_type": "HR",
+            "result": "Passed",
+            "date": date(2024, 1, 15),
+        }
+        vote_id = store_vote(metadata, engine=self.engine)
+        self.assertIsNotNone(vote_id)
+        self.assertIsInstance(vote_id, int)
 
     def test_store_vote_filters_extra_keys(self):
         """Verifies store_vote() ignores keys not in VOTE_FIELDS."""
@@ -128,9 +144,6 @@ class TestStoreMember(unittest.TestCase):
             chamber="House",
             picture_url="https://example.com/photo.jpg",
             photo_cred=None,
-            committees=None,
-            authored_leg=None,
-            co_authored_leg=None,
             engine=self.engine,
         )
         with Session(self.engine) as session:
@@ -150,9 +163,6 @@ class TestStoreMember(unittest.TestCase):
             chamber="Senate",
             picture_url=None,
             photo_cred=None,
-            committees=None,
-            authored_leg=None,
-            co_authored_leg=None,
             engine=self.engine,
         )
         with Session(self.engine) as session:
@@ -171,9 +181,6 @@ class TestStoreMember(unittest.TestCase):
             chamber="House",
             picture_url=None,
             photo_cred=None,
-            committees=None,
-            authored_leg=None,
-            co_authored_leg=None,
             engine=self.engine,
         )
         with Session(self.engine) as session:
@@ -192,9 +199,6 @@ class TestStoreMember(unittest.TestCase):
                 chamber="House",
                 picture_url=None,
                 photo_cred=None,
-                committees=None,
-                authored_leg=None,
-                co_authored_leg=None,
                 engine=self.engine,
             )
         with Session(self.engine) as session:
@@ -463,6 +467,7 @@ class TestStoreVoteSummary(unittest.TestCase):
         self.assertEqual(result.legislation_type, "HR")
         self.assertEqual(result.result, "Passed")
 
+
 def make_sponsored_bill(engine, member_id="A000001"):
     """Inserts a minimal valid SponsoredLegislation row and returns its id."""
     with Session(engine) as session:
@@ -475,8 +480,8 @@ def make_sponsored_bill(engine, member_id="A000001"):
         session.add(bill)
         session.commit()
         return bill.id
- 
- 
+
+
 def make_cosponsored_bill(engine, member_id="A000001"):
     """Inserts a minimal valid CosponsoredLegislation row and returns its id."""
     with Session(engine) as session:
@@ -489,15 +494,15 @@ def make_cosponsored_bill(engine, member_id="A000001"):
         session.add(bill)
         session.commit()
         return bill.id
- 
- 
+
+
 class TestStoreSponsoredLegislation(unittest.TestCase):
- 
+
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.member_id = make_member(self.engine)
- 
+
     def test_inserts_row(self):
         """Verifies store_sponsored_legislation() inserts a row with correct field values."""
         store_sponsored_legislation(
@@ -513,7 +518,7 @@ class TestStoreSponsoredLegislation(unittest.TestCase):
         self.assertEqual(result.legislation_number, "508")
         self.assertEqual(result.legislation_type, "S")
         self.assertEqual(result.policy_area, "Environmental Protection")
- 
+
     def test_inserts_multiple_rows(self):
         """Verifies store_sponsored_legislation() correctly inserts multiple bills for one member."""
         store_sponsored_legislation(
@@ -533,7 +538,7 @@ class TestStoreSponsoredLegislation(unittest.TestCase):
         with Session(self.engine) as session:
             count = session.query(SponsoredLegislation).count()
         self.assertEqual(count, 2)
- 
+
     def test_policy_area_none(self):
         """Verifies store_sponsored_legislation() stores None for policy_area when not provided."""
         store_sponsored_legislation(
@@ -546,7 +551,7 @@ class TestStoreSponsoredLegislation(unittest.TestCase):
         with Session(self.engine) as session:
             result = session.query(SponsoredLegislation).first()
         self.assertIsNone(result.policy_area)
- 
+
     def test_other_fields_unchanged(self):
         """Verifies store_sponsored_legislation() does not modify member_id or legislation_type."""
         store_sponsored_legislation(
@@ -560,15 +565,15 @@ class TestStoreSponsoredLegislation(unittest.TestCase):
             result = session.query(SponsoredLegislation).first()
         self.assertEqual(result.member_id, self.member_id)
         self.assertEqual(result.legislation_type, "S")
- 
- 
+
+
 class TestStoreCosponsoredLegislation(unittest.TestCase):
- 
+
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.member_id = make_member(self.engine)
- 
+
     def test_inserts_row(self):
         """Verifies store_cosponsored_legislation() inserts a row with correct field values."""
         store_cosponsored_legislation(
@@ -584,7 +589,7 @@ class TestStoreCosponsoredLegislation(unittest.TestCase):
         self.assertEqual(result.legislation_number, "1234")
         self.assertEqual(result.legislation_type, "HR")
         self.assertEqual(result.policy_area, "Health")
- 
+
     def test_inserts_multiple_rows(self):
         """Verifies store_cosponsored_legislation() correctly inserts multiple bills for one member."""
         store_cosponsored_legislation(
@@ -604,7 +609,7 @@ class TestStoreCosponsoredLegislation(unittest.TestCase):
         with Session(self.engine) as session:
             count = session.query(CosponsoredLegislation).count()
         self.assertEqual(count, 2)
- 
+
     def test_multiple_members_same_bill(self):
         """Verifies store_cosponsored_legislation() allows multiple members to cosponsor the same bill."""
         second_member_id = make_member(self.engine, member_id="B000002")
@@ -625,7 +630,7 @@ class TestStoreCosponsoredLegislation(unittest.TestCase):
         with Session(self.engine) as session:
             count = session.query(CosponsoredLegislation).count()
         self.assertEqual(count, 2)
- 
+
     def test_policy_area_none(self):
         """Verifies store_cosponsored_legislation() stores None for policy_area when not provided."""
         store_cosponsored_legislation(
@@ -638,7 +643,7 @@ class TestStoreCosponsoredLegislation(unittest.TestCase):
         with Session(self.engine) as session:
             result = session.query(CosponsoredLegislation).first()
         self.assertIsNone(result.policy_area)
- 
+
     def test_other_fields_unchanged(self):
         """Verifies store_cosponsored_legislation() does not modify member_id or legislation_type."""
         store_cosponsored_legislation(
@@ -652,7 +657,6 @@ class TestStoreCosponsoredLegislation(unittest.TestCase):
             result = session.query(CosponsoredLegislation).first()
         self.assertEqual(result.member_id, self.member_id)
         self.assertEqual(result.legislation_type, "HR")
- 
 
 
 if __name__ == "__main__":

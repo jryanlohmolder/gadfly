@@ -17,7 +17,9 @@ class Vote(Base):
         legislation_type (str): Type of legislation (e.g. 'HR', 'S').
         result (str): Outcome of the vote (e.g. 'Passed', 'Failed').
         date (Date): Date the vote was held.
-        description (str): LLM-generated summary, populated after bill text is fetched.
+        chunk_count (int): how many chunks the bill had to be broken into for LLM to parse.
+        summary (str): LLM-generated summary, populated after bill text is fetched.
+        bill_text (test): Actual text of the bill.
     """
 
     __tablename__ = "votes"
@@ -31,6 +33,7 @@ class Vote(Base):
     date = Column(Date)
     chunk_count = Column(Integer)
     summary = Column(Text)
+    bill_text = Column(Text)
 
 
 class Member(Base):
@@ -44,7 +47,6 @@ class Member(Base):
         district (int): the district the representative represents
         chamber (str): specifies if the representative is in the house or senate
         picture_url (text): provides an image of the representative
-        committees (text): all the committees the represenative sits on
         authored_leg (text): lists all the bills the representative has written
         co_authored_leg (text): lists all bills representative has coauthored
 
@@ -59,9 +61,6 @@ class Member(Base):
     chamber = Column(String, nullable=False)
     picture_url = Column(Text)
     photo_cred = Column(Text)
-    committees = Column(Text)
-    authored_leg = Column(Text)
-    co_authored_leg = Column(Text)
 
 
 class MemberVote(Base):
@@ -76,7 +75,7 @@ class MemberVote(Base):
 
     __tablename__ = "member_votes"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    member_id = Column(Integer, ForeignKey("members.member_id"), nullable=False)  
+    member_id = Column(String, ForeignKey("members.member_id"), nullable=False)  
     vote_id = Column(Integer, ForeignKey("votes.vote_id"), nullable=False)
     position = Column(String)
 
