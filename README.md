@@ -2,14 +2,20 @@
 
 **Gadfly** is a civic transparency tool that ingests congressional voting data from the Congress API and presents it as accessible, searchable profiles for every sitting member of Congress.
 
+> **Status:** Data pipeline complete (members, votes, bill text, member positions, and AI categorization). Web interface is in progress — sections marked _Planned_ below are not yet built.
+
 ---
 
 ## What It Does
 
-Enter your zip code on the homepage to pull up your two U.S. Senators and your House Representative. Click any of them to see:
+The goal: enter your zip code to pull up your two U.S. Senators and your House Representative, then click any of them to see how they actually vote — in plain language.
 
-- **Voting profile** a full log of their votes with bill descriptions
-- **Committees** any bills they authored, co-authored, or voted *for* that reduced government accountability, expanded military spending, or restricted individual rights
+For each member the data layer currently supports:
+
+- **Voting profile** — a full log of their votes, each with a plain-language summary of the bill, the policy categories it touches, the directional lean within each category, and any flags raised during analysis.
+- **Legislation** — the bills they sponsored or cosponsored, with policy area.
+
+A derived "accountability" view (bills that reduced government oversight, expanded military spending, or restricted individual rights) is _Planned_ — it will be built on top of the flags and category directions already stored per vote.
 
 ---
 
@@ -28,9 +34,8 @@ All data is stored in SQLite. Fields are sourced from the Congress API unless no
 | `chamber` | Congress API |
 | `picture_url` | Congress API |
 | `photo_cred` | Congress API |
-| `committees` | Congress API |
-| `authored_leg` | Congress API |
-| `co_authored_leg` | Congress API |
+
+> Sponsored and cosponsored legislation are stored in their own tables (below), not as columns on Members. Committee data is out of scope for the MVP.
 
 ### Votes
 | Field | Source |
@@ -43,6 +48,7 @@ All data is stored in SQLite. Fields are sourced from the Congress API unless no
 | `legislation_type` | Congress API |
 | `result` | Congress API |
 | `date` | Congress API |
+| `bill_text` | Congress API (full bill text) |
 | `summary` | Generated via Claude API |
 | `chunk_count` | Generated via Claude API |
 
@@ -60,8 +66,8 @@ All data is stored in SQLite. Fields are sourced from the Congress API unless no
 | `id` | Generated (autoincrement) |
 | `vote_id` | Foreign key to Votes |
 | `category` | Generated via Claude API |
-| `direction` | Generated via Claude API |
-| `flagged` | Generated via Claude API |
+| `direction` | Generated via Claude API (directional label, or "Internal contradiction") |
+| `flagged` | Generated via Claude API (true if internally contradictory) |
 
 ### VoteFlags
 | Field | Source |
@@ -71,6 +77,24 @@ All data is stored in SQLite. Fields are sourced from the Congress API unless no
 | `flag_name` | Generated via Claude API |
 | `severity` | Generated via Claude API |
 | `explanation` | Generated via Claude API |
+
+### SponsoredLegislation
+| Field | Source |
+|---|---|
+| `id` | Generated (autoincrement) |
+| `member_id` | Foreign key to Members |
+| `legislation_number` | Congress API |
+| `legislation_type` | Congress API |
+| `policy_area` | Congress API (may be null) |
+
+### CosponsoredLegislation
+| Field | Source |
+|---|---|
+| `id` | Generated (autoincrement) |
+| `member_id` | Foreign key to Members |
+| `legislation_number` | Congress API |
+| `legislation_type` | Congress API |
+| `policy_area` | Congress API (may be null) |
 
 ### Flags Reference
 | Flag | Severity | Triggers When |
@@ -89,7 +113,7 @@ All data is stored in SQLite. Fields are sourced from the Congress API unless no
 
 ## Policy Categories
 
-Each vote is tagged with applicable categories from the following list. For each category, a vote *for* and a vote *against* the bill is mapped to one of two directional binaries.
+Each vote is tagged with the applicable categories from the list below. For each applicable category, the bill is classified as moving in one of two directions (Binary A or Binary B). If the bill pulls both ways within a single category, that category is marked as an internal contradiction and flagged.
 
 | # | Category | Binary A | Binary B |
 |---|---|---|---|
@@ -110,34 +134,37 @@ Each vote is tagged with applicable categories from the following list. For each
 
 ## AI-Assisted Categorization
 
-Each bill is sent to the Claude API with its full text and the 11 categories above. Claude is instructed to:
+Each bill is sent to the Claude API with its full text and the 12 categories above. Claude is instructed to:
 
-1. Identify which categories apply to the bill
-2. Determine which directional binary a **yea** vote and a **nay** vote corresponds to
-3. Flag any internal contradictions within the bill across categories
-4. Write a plain-language summary of the bill
+1. Identify which categories apply to the bill.
+2. For each applicable category, determine which directional binary the bill moves toward.
+3. Raise any applicable flags (see Flags Reference) and mark internal contradictions.
+4. Write a plain-language summary describing only what the bill mechanically changes — what it adds, removes, restricts, allocates, or requires — without characterizing intent or likely impact.
 
-The summary is stored in the `description` field of the `Votes` table. Categories (excluding any flagged contradictions) are stored in `VoteCategories`.
+Bills whose text exceeds the token limit are split into chunks, analyzed separately, and synthesized into a single result.
+
+The summary is stored in the `summary` field of the `Votes` table. All applicable categories are stored in `VoteCategories`; categories with an internal contradiction are stored with `flagged = true`. Categories that don't apply to a bill are dropped rather than stored.
 
 ---
 
-## Web Interface
+## Web Interface _(Planned)_
 
-Built with **Flask**. Navigation tabs:
+Built with **Flask**. Planned navigation:
 
-- **Home** member selection
-- **About** a searchable list of bills that reduced corruption oversight, expanded military spending, or restricted individual rights; includes bill author(s), co-authors, and description
+- **Home** — zip-code member selection (look up your senators + house rep)
+- **Member Profile** — per-member voting record and legislation
+- **About** — searchable list of bills surfaced by the accountability flags (reduced oversight, expanded military spending, restricted individual rights), with sponsors and summaries
 
-### Member Profile Page
+### Member Profile Page _(Planned)_
 
-The **header** (always visible) displays: photo, chamber, state, party, and committee memberships.
+The **header** (always visible) displays: photo, chamber, state, and party.
 
 Below the header, tabbed sections:
 
 | Tab | Contents |
 |---|---|
-| **Voting Profile** | 12 category bars showing directional lean (0 direction: *reduce oversight / accountability*
-- **Foreign Policy, War & National Security** direction: *restrict rights / increase restrictions*
+| **Voting Profile** | Directional-lean bars across the 12 categories, plus the member's vote log with summaries and flags |
+| **Legislation** | Bills the member sponsored or cosponsored, by policy area |
 
 ---
 
