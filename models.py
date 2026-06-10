@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Date, Text, Boolean, ForeignKey
+from sqlalchemy import Column, String, Integer, Date, Text, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase
 
 class Base(DeclarativeBase):
@@ -19,10 +19,12 @@ class Vote(Base):
         date (Date): Date the vote was held.
         chunk_count (int): how many chunks the bill had to be broken into for LLM to parse.
         summary (str): LLM-generated summary, populated after bill text is fetched.
-        bill_text (test): Actual text of the bill.
+        bill_text (str): Actual text of the bill.
     """
 
     __tablename__ = "votes"
+    __table_args__ = (UniqueConstraint("congress", "session", "roll_call_number"),)
+
     vote_id = Column(Integer, primary_key=True, autoincrement=True)
     congress = Column(Integer, nullable=False)
     session = Column(Integer, nullable=False)

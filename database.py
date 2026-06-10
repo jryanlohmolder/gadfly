@@ -13,6 +13,7 @@ VOTE_FIELDS = {
     "legislation_type",
     "result",
     "date",
+    "bill_text",
 }
 
 
@@ -225,3 +226,70 @@ def store_cosponsored_legislation(member_id, legislation_number, legislation_typ
         )
         session.add(new_bill)
         session.commit()
+
+def vote_exists(congress, session, roll_call_number, engine=None):
+    """
+    Checks whether a vote already exists in the votes table.
+
+    Args:
+        congress (int): Congress number (e.g. 118)
+        session (int): Legislative session number
+        roll_call_number (int): Roll call number for this vote
+
+    Returns:
+        bool: True if the vote exists, False if not
+
+    Raises:
+        sqlalchemy.exc.SQLAlchemyError: If the query fails.
+    """
+
+    if engine is None:
+        engine = get_engine()
+    with Session(engine) as session_db:
+        result = session_db.query(Vote).filter_by(
+            congress=congress,
+            session=session,
+            roll_call_number=roll_call_number
+        ).first()
+
+    return result is not None
+
+def get_unanalyzed_votes(engine=None):
+    """
+    Returns all votes that have not yet been analyzed by the LLM.
+
+    Args:
+        engine: SQLAlchemy engine. Creates one if not provided.
+
+    Returns:
+        list[dict]: Each dict contains vote_id and bill_text for unanalyzed votes.
+
+    Raises:
+        sqlalchemy.exc.SQLAlchemyError: If the query fails.
+    """
+
+    if engine is None:
+        engine = get_engine()
+
+    with Session(engine) as session:
+        results = session.query(Vote).filter(Vote.summary == None).all()
+        return [{"vote_id": v.vote_id, "bill_text": v.bill_text} for v in results]
+    
+def member_exists(member_id, engine=None):
+    """
+    Checks whether a member already exists in the members table.
+
+    Args:
+        member_id (str): Bioguide ID of the member.
+
+    Returns:
+        bool: True if the member exists, False if not.
+
+    Raises:
+        sqlalchemy.exc.SQLAlchemyError: If the query fails.
+    """
+    if engine is None:
+        engine = get_engine()
+    with Session(engine) as session:
+        result = session.get(Member, member_id)
+    return result is not None

@@ -3,7 +3,7 @@ from datetime import date
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from models import Base, Vote, Member, MemberVote, Category, VoteFlag, SponsoredLegislation, CosponsoredLegislation
-from database import store_vote, store_member, store_member_vote, store_category, store_vote_flag, store_vote_summary, store_sponsored_legislation, store_cosponsored_legislation
+from database import store_vote, store_member, store_member_vote, store_category, store_vote_flag, store_vote_summary, store_sponsored_legislation, store_cosponsored_legislation, vote_exists, get_unanalyzed_votes, member_exists
 
 
 # Helpers
@@ -658,6 +658,131 @@ class TestStoreCosponsoredLegislation(unittest.TestCase):
         self.assertEqual(result.member_id, self.member_id)
         self.assertEqual(result.legislation_type, "HR")
 
+
+class TestVoteExists(unittest.TestCase):
+    def setUp(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.metadata = {
+            "congress": 118,
+            "session": 1,
+            "roll_call_number": 412,
+            "legislation_number": "HR 1234",
+            "legislation_type": "HR",
+            "result": "Passed",
+            "date": date(2024, 1, 15),
+        }
+
+    def test_vote_does_not_exist(self):
+        """Verifies vote_exists() returns False when no matching vote is in the table."""
+        result = vote_exists(118, 1, 412, engine=self.engine)
+        self.assertFalse(result)
+
+    def test_vote_exists(self):
+        """Verifies vote_exists() returns True after a matching vote is stored."""
+        store_vote(self.metadata, engine=self.engine)
+        result = vote_exists(118, 1, 412, engine=self.engine)
+        self.assertTrue(result)
+
+    def test_vote_exists_wrong_congress(self):
+        """Verifies vote_exists() returns False when congress does not match."""
+        store_vote(self.metadata, engine=self.engine)
+        result = vote_exists(119, 1, 412, engine=self.engine)
+        self.assertFalse(result)
+
+    def test_vote_exists_wrong_session(self):
+        """Verifies vote_exists() returns False when session does not match."""
+        store_vote(self.metadata, engine=self.engine)
+        result = vote_exists(118, 2, 412, engine=self.engine)
+        self.assertFalse(result)
+
+    def test_vote_exists_wrong_roll_call(self):
+        """Verifies vote_exists() returns False when roll_call_number does not match."""
+        store_vote(self.metadata, engine=self.engine)
+        result = vote_exists(118, 1, 413, engine=self.engine)
+        self.assertFalse(result)
+
+
+class TestGetUnanalyzedVotes(unittest.TestCase):
+    def setUp(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.metadata = {
+            "congress": 118,
+            "session": 1,
+            "roll_call_number": 412,
+            "legislation_number": "HR 1234",
+            "legislation_type": "HR",
+            "result": "Passed",
+            "date": date(2024, 1, 15),
+        }
+
+    def test_returns_empty_when_no_votes(self):
+        """Verifies get_unanalyzed_votes() returns empty list when table is empty."""
+        result = get_unanalyzed_votes(engine=self.engine)
+        self.assertEqual(result, [])
+
+    def test_returns_vote_with_no_summary(self):
+        """Verifies get_unanalyzed_votes() returns votes where summary is None."""
+        store_vote(self.metadata, engine=self.engine)
+        result = get_unanalyzed_votes(engine=self.engine)
+        self.assertEqual(len(result), 1)
+
+    def test_excludes_already_analyzed_votes(self):
+        """Verifies get_unanalyzed_votes() skips votes that already have a summary."""
+        vote_id = store_vote(self.metadata, engine=self.engine)
+        store_vote_summary(vote_id, "A summary", 3, engine=self.engine)
+        result = get_unanalyzed_votes(engine=self.engine)
+        self.assertEqual(result, [])
+
+    def test_returns_correct_keys(self):
+        """Verifies each returned dict contains vote_id and bill_text."""
+        store_vote(self.metadata, engine=self.engine)
+        result = get_unanalyzed_votes(engine=self.engine)
+        self.assertIn("vote_id", result[0])
+        self.assertIn("bill_text", result[0])
+
+    def test_mixed_analyzed_and_not(self):
+        """Verifies only unanalyzed votes are returned when both exist."""
+        vote_id = store_vote(self.metadata, engine=self.engine)
+        store_vote_summary(vote_id, "A summary", 3, engine=self.engine)
+        self.metadata["roll_call_number"] = 413
+        store_vote(self.metadata, engine=self.engine)
+        result = get_unanalyzed_votes(engine=self.engine)
+        self.assertEqual(len(result), 1)
+
+
+class TestMemberExists(unittest.TestCase):
+    def setUp(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.member_kwargs = {
+            "member_id": "W000779",
+            "name": "Wyden, Ron",
+            "state": "Oregon",
+            "district": None,
+            "party": "Democratic",
+            "chamber": "Senate",
+            "picture_url": "https://example.com/wyden.jpg",
+            "photo_cred": "Senate Photo Studio",
+        }
+
+    def test_member_does_not_exist(self):
+        """Verifies member_exists() returns False when no matching member is in the table."""
+        result = member_exists("W000779", engine=self.engine)
+        self.assertFalse(result)
+
+    def test_member_exists(self):
+        """Verifies member_exists() returns True after a matching member is stored."""
+        store_member(**self.member_kwargs, engine=self.engine)
+        result = member_exists("W000779", engine=self.engine)
+        self.assertTrue(result)
+
+    def test_member_exists_wrong_id(self):
+        """Verifies member_exists() returns False when member_id does not match."""
+        store_member(**self.member_kwargs, engine=self.engine)
+        result = member_exists("P000197", engine=self.engine)
+        self.assertFalse(result)
 
 if __name__ == "__main__":
     unittest.main()

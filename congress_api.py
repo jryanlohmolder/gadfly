@@ -455,7 +455,7 @@ def get_sponsored_leg(api_key, member_id):
                 # Extract legislation number and policy area
                 sponsored_leg["legislation_number"] = bill["number"]
                 sponsored_leg["policy_area"] = bill.get("policyArea", {}).get("name")
-                sponsored_leg["type"] = bill["type"]
+                sponsored_leg["legislation_type"] = bill["type"]
                 
                 # Add dict to sponsored legislation
                 sponsored_bills.append(sponsored_leg)
@@ -535,7 +535,7 @@ def get_cosponsored_leg(api_key, member_id):
                 # Extract legislation number and policy area
                 cosponsored_leg["legislation_number"] = bill["number"]
                 cosponsored_leg["policy_area"] = bill.get("policyArea", {}).get("name")
-                cosponsored_leg["type"] = bill["type"]
+                cosponsored_leg["legislation_type"] = bill["type"]
                 
                 # Add dict to sponsored legislation
                 cosponsored_bills.append(cosponsored_leg)

@@ -227,6 +227,9 @@ def parse_bill_text(text):
             print(f"JSON parsing error: {e}")
             raise
 
+        # Bill fit in one chunk
+        result["chunk_count"] = 1
+
     else:
         chunk_results = []
         chunks = [text[i:i + CHUNK_SIZE] for i in range(0, len(text), CHUNK_SIZE)]
@@ -316,6 +319,10 @@ def parse_bill_text(text):
         except json.JSONDecodeError as e:
             print(f"JSON parsing error: {e}")
             raise
+
+        # Number of chunks the bill was split into (captures bill length,
+        # even if some chunks failed JSON parsing)
+        result["chunk_count"] = len(chunks) 
 
     return strip_absent(result)
 
