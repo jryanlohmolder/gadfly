@@ -1,6 +1,8 @@
 .env
 pyrightconfig.json
-__pycache__
+__pycache__/
 .pytest_cache
 *.pyc
 congress_voting_data.db
+logs/
+tab20_cd11920_zcta520_natl.txt

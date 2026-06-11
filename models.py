@@ -154,3 +154,20 @@ class CosponsoredLegislation(Base):
     legislation_number = Column(String, nullable=False)
     legislation_type = Column(Text, nullable=False)
     policy_area = Column(Text)
+
+
+class ZipDistrict(Base):
+    """
+    Represents a single zip code to congressional district overlap
+    from the Census ZCTA-to-CD119 relationship file.
+
+    Attributes:
+        zcta (str): 5-digit ZIP Code Tabulation Area code. Part of composite primary key.
+        state (str): 2-digit state FIPS code. Part of composite primary key.
+        district (int): Congressional district number (0 for at-large). Part of composite primary key.
+    """
+
+    __tablename__ = "zip_district"
+    zcta = Column(String, primary_key=True)
+    state = Column(String, primary_key=True)
+    district = Column(Integer, primary_key=True)

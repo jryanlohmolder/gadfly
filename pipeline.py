@@ -39,6 +39,7 @@ def load_members(congress_api_key, congress, engine=None):
         # Skip if member already exists
         if database.member_exists(member["member_id"]):
             continue
+        print(f"loading member: {member['name']}", flush=True)
 
         # Get sponsored and co-sponsored legislation
         sponsored_leg = congress_api.get_sponsored_leg(congress_api_key, member["member_id"])
@@ -95,6 +96,7 @@ def load_votes(congress_api_key, congress, engine=None):
     
     # Loop over votes
     for vote in votes:
+        print(f"loading vote: {vote['roll_call_number']}", flush=True)
         # Check if vote exists
         if database.vote_exists(vote["congress"], vote["session"], vote["roll_call_number"]):
             continue
@@ -163,7 +165,7 @@ def categorize_votes(engine, limit=None):
         # Store flags
         for name, data in result["flags"].items():
             database.store_vote_flag(vote["vote_id"], name, data["severity"], data["explanation"], engine)
-            
+
     # Print progress
     print(f"votes categorized: {len(votes)}")
 

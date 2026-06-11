@@ -96,7 +96,7 @@ def get_all_votes(api_key, congress):
                 all_votes.append(relevant_vote)
 
         # Set url pagination to next or None
-        if data["pagination"]["next"]:
+        if data["pagination"].get("next"):
             url = data["pagination"]["next"] + "&api_key=" + api_key
         else:
             url = None
@@ -369,8 +369,8 @@ def get_all_members(api_key, congress):
             member_dict["party"] = member["partyName"]
 
             # extract member's chamber
-            for item in member["terms"]["item"]:
-                if "endYear" not in item.keys():
+            for item in member.get("terms", {}).get("item", []):
+                if "endYear" not in item:
                     member_dict["chamber"] = item["chamber"]
 
             member_dict["picture_url"] = member.get("depiction", {}).get("imageUrl")
@@ -381,7 +381,7 @@ def get_all_members(api_key, congress):
                 representatives.append(member_dict)
 
         # set url to pagination["next"] or None
-        if data["pagination"]["next"]:
+        if data["pagination"].get("next"):
             url = data["pagination"]["next"] + "&api_key=" + api_key
         else:
             url = None
@@ -443,8 +443,12 @@ def get_sponsored_leg(api_key, member_id):
                 break
             
             except requests.exceptions.RequestException as e:
-                print(f"Network error: {e}")
-                raise
+                print(f"Network error: {e}, retrying...", flush=True)
+                exponential_backoff(count)
+                count += 1
+                if count == run_cap:
+                    raise requests.exceptions.RetryError("Max retries exceeded")
+                continue
 
         # Loop of legislation
         for bill in leg:
@@ -461,7 +465,7 @@ def get_sponsored_leg(api_key, member_id):
                 sponsored_bills.append(sponsored_leg)
 
         # Set url pagination to next or None
-        if data["pagination"]["next"]:
+        if data["pagination"].get("next"):
             url = data["pagination"]["next"] + "&api_key=" + api_key
         else:
             url = None
@@ -523,8 +527,12 @@ def get_cosponsored_leg(api_key, member_id):
                 break
             
             except requests.exceptions.RequestException as e:
-                print(f"Network error: {e}")
-                raise
+                print(f"Network error: {e}, retrying...", flush=True)
+                exponential_backoff(count)
+                count += 1
+                if count == run_cap:
+                    raise requests.exceptions.RetryError("Max retries exceeded")
+                continue
 
         # Loop of legislation
         for bill in leg:
@@ -541,7 +549,7 @@ def get_cosponsored_leg(api_key, member_id):
                 cosponsored_bills.append(cosponsored_leg)
 
         # Set url pagination to next or None
-        if data["pagination"]["next"]:
+        if data["pagination"].get("next"):
             url = data["pagination"]["next"] + "&api_key=" + api_key
         else:
             url = None

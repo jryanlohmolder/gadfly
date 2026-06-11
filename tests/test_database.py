@@ -1,9 +1,12 @@
 import unittest
+import tempfile
+
 from datetime import date
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from models import Base, Vote, Member, MemberVote, Category, VoteFlag, SponsoredLegislation, CosponsoredLegislation
-from database import store_vote, store_member, store_member_vote, store_category, store_vote_flag, store_vote_summary, store_sponsored_legislation, store_cosponsored_legislation, vote_exists, get_unanalyzed_votes, member_exists
+from models import Base, Vote, Member, MemberVote, Category, VoteFlag, SponsoredLegislation, CosponsoredLegislation, ZipDistrict
+from database import store_vote, store_member, store_member_vote, store_category, store_vote_flag, store_vote_summary, store_sponsored_legislation, store_cosponsored_legislation, vote_exists, get_unanalyzed_votes, member_exists, load_zip_districts
 
 
 # Helpers
@@ -783,6 +786,99 @@ class TestMemberExists(unittest.TestCase):
         store_member(**self.member_kwargs, engine=self.engine)
         result = member_exists("P000197", engine=self.engine)
         self.assertFalse(result)
+
+
+class TestLoadZipDistricts(unittest.TestCase):
+
+    def setUp(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.file_path = Path(self.tmp_dir.name) / "fake_crosswalk.txt"
+
+    def tearDown(self):
+        self.tmp_dir.cleanup()
+
+    def test_happy_path(self):
+        """Verifies load_zip_districts() parses valid rows and stores zcta, state, and district correctly."""
+
+        # Build fake crosswalk file
+        self.file_path.write_text(
+            "h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h\n"                
+            "x|0101|x|x|x|x|x|x|36009|x|x|x|x|x|x|x|x\n"    
+            "x|3610|x|x|x|x|x|x|10001|x|x|x|x|x|x|x|x\n"         
+        )
+
+        # Run loader against it
+        load_zip_districts(str(self.file_path), engine=self.engine)
+
+        with Session(self.engine) as session:
+            rows = session.query(ZipDistrict).all()
+        
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0].zcta, "36009")
+        self.assertEqual(rows[0].state, "01")
+        self.assertEqual(rows[0].district, 1)
+
+    def test_skips_invalid_rows(self):
+        """Verifies load_zip_districts() skips rows with no ZCTA and rows with district 'ZZ'."""
+        
+        # Build fake file: one good row, one empty-zcta row, one ZZ row
+        self.file_path.write_text(
+            "h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h\n"
+            "x|0101|x|x|x|x|x|x|36009|x|x|x|x|x|x|x|x\n"
+            "x|0101|x|x|x|x|x|x||x|x|x|x|x|x|x|x\n"
+            "x|01ZZ|x|x|x|x|x|x|36011|x|x|x|x|x|x|x|x\n"
+        )
+        # Run loader against it
+        load_zip_districts(str(self.file_path), engine=self.engine)
+        # Assert only the good row landed
+        with Session(self.engine) as session:
+            rows = session.query(ZipDistrict).all()
+        
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].zcta, "36009")
+
+    def test_idempotency(self):
+        """Verifies load_zip_districts() does not double the count if there are two loads of a file"""
+
+        # Build fake crosswalk file
+        self.file_path.write_text(
+            "h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h\n"                
+            "x|0101|x|x|x|x|x|x|36009|x|x|x|x|x|x|x|x\n"    
+            "x|3610|x|x|x|x|x|x|10001|x|x|x|x|x|x|x|x\n"         
+        )
+
+
+        # Run loader against
+        load_zip_districts(str(self.file_path), engine=self.engine)
+
+        # Run loader against a second time
+        load_zip_districts(str(self.file_path), engine=self.engine)
+
+        # Assert the was not a double count
+        with Session(self.engine) as session:
+            rows = session.query(ZipDistrict).all()
+
+        self.assertEqual(len(rows), 2)
+
+    def test_at_large_conversion(self):
+        """Verifies district is stored correctly"""
+
+        self.file_path.write_text(
+            "h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h|h\n"                
+            "x|0200|x|x|x|x|x|x|97009|x|x|x|x|x|x|x|x\n"             
+        )
+
+
+        # Run loader against
+        load_zip_districts(str(self.file_path), engine=self.engine)
+        # Assert only the good row landed
+        with Session(self.engine) as session:
+            rows = session.query(ZipDistrict).all()
+
+        self.assertEqual(rows[0].district, 0)
+        self.assertIsInstance(rows[0].district, int)
 
 if __name__ == "__main__":
     unittest.main()

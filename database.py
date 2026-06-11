@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from models import Vote, MemberVote, Category, VoteFlag, Member, Base, SponsoredLegislation, CosponsoredLegislation
+from models import Vote, MemberVote, Category, VoteFlag, Member, Base, SponsoredLegislation, CosponsoredLegislation, ZipDistrict
 
 
 # Constants
@@ -177,18 +177,29 @@ def store_member(member_id, name, state, district, party, chamber, picture_url, 
     if engine is None:
         engine = get_engine()
     with Session(engine) as session:
-        new_member = Member(member_id=member_id, name=name, state=state, district=district, party=party, chamber=chamber, picture_url=picture_url, photo_cred=photo_cred)
+        new_member = Member(
+            member_id=member_id, 
+            name=name, 
+            state=state, 
+            district=district, 
+            party=party, 
+            chamber=chamber, 
+            picture_url=picture_url, 
+            photo_cred=photo_cred)
+        
         session.add(new_member)
         session.commit()
 
 def store_sponsored_legislation(member_id, legislation_number, legislation_type, policy_area, engine=None):
     """
     Inserts a sponsored legislation record into the sponsored_legislation table.
+    
     Args:
         member_id (str): Foreign key referencing the members table.
         legislation_number (str): Bill identifier (e.g. '508').
         legislation_type (str): Type of legislation (e.g. 'HR', 'S').
         policy_area (str): Policy area of the legislation (e.g. 'Environmental Protection'). May be None.
+    
     Raises:
         sqlalchemy.exc.SQLAlchemyError: If the insert or commit fails.
     """
@@ -207,11 +218,13 @@ def store_sponsored_legislation(member_id, legislation_number, legislation_type,
 def store_cosponsored_legislation(member_id, legislation_number, legislation_type, policy_area, engine=None):
     """
     Inserts a cosponsored legislation record into the cosponsored_legislation table.
+    
     Args:
         member_id (str): Foreign key referencing the members table.
         legislation_number (str): Bill identifier (e.g. '1234').
         legislation_type (str): Type of legislation (e.g. 'HR', 'S').
         policy_area (str): Policy area of the legislation (e.g. 'Health'). May be None.
+    
     Raises:
         sqlalchemy.exc.SQLAlchemyError: If the insert or commit fails.
     """
@@ -293,3 +306,53 @@ def member_exists(member_id, engine=None):
     with Session(engine) as session:
         result = session.get(Member, member_id)
     return result is not None
+
+def load_zip_districts(file_path, engine=None):
+    """
+    Loads the Census ZCTA-to-CD119 relationship file into the zip_districts table.
+
+    Parses the pipe-delimited file, keeping the zip code (ZCTA) and splitting
+    each district GEOID into a state FIPS code and district number. Skips rows
+    with no ZCTA and rows with no defined district ('ZZ'). Rows are merged on
+    the composite primary key, so re-running the loader is safe. Commits once
+    after all rows are staged.
+
+    Args:
+        file_path (str): Path to the relationship file (tab20_cd11920_zcta520_natl.txt).
+        engine: SQLAlchemy engine. Creates one if not provided.
+
+    Returns:
+        None
+
+    Raises:
+        FileNotFoundError: If file_path does not exist.
+        sqlalchemy.exc.SQLAlchemyError: If the merge or commit fails.
+    """
+
+    if engine is None:
+        engine = get_engine()
+    with Session(engine) as session:
+        with open(file_path) as f:
+            # skip/header
+            next(f)
+            # Loop lines
+            for line in f:
+                fields = line.strip().split("|")
+                # Grab columns zcta, state and district column
+                geo_id = fields[1]
+                zcta = fields[8]
+
+                # Filter out areas not belonging to a district
+                if not zcta or geo_id[2:] == "ZZ":
+                    continue
+                
+                # Build Row
+                new_zip_district = ZipDistrict(
+                    zcta=zcta,
+                    state=geo_id[:2],
+                    district=int(geo_id[2:]),
+                )
+                # Merge table
+                session.merge(new_zip_district)
+
+        session.commit()
