@@ -1,3 +1,5 @@
+import re
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,36 @@ VOTE_FIELDS = {
     "bill_text",
 }
 
+FIPS_TO_STATE = {
+    "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas",
+    "06": "California", "08": "Colorado", "09": "Connecticut", "10": "Delaware",
+    "11": "District of Columbia", "12": "Florida", "13": "Georgia", "15": "Hawaii",
+    "16": "Idaho", "17": "Illinois", "18": "Indiana", "19": "Iowa",
+    "20": "Kansas", "21": "Kentucky", "22": "Louisiana", "23": "Maine",
+    "24": "Maryland", "25": "Massachusetts", "26": "Michigan", "27": "Minnesota",
+    "28": "Mississippi", "29": "Missouri", "30": "Montana", "31": "Nebraska",
+    "32": "Nevada", "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico",
+    "36": "New York", "37": "North Carolina", "38": "North Dakota", "39": "Ohio",
+    "40": "Oklahoma", "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island",
+    "45": "South Carolina", "46": "South Dakota", "47": "Tennessee", "48": "Texas",
+    "49": "Utah", "50": "Vermont", "51": "Virginia", "53": "Washington",
+    "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming", "72": "Puerto Rico"
+}
+
+CATEGORY_DIRECTIONS = {
+    "Economy & Cost of Living": ("Expand spending / stimulus", "Cut spending / austerity"),
+    "Immigration & Border Security": ("Expand pathways / access", "Restrict entry / tighten borders"),
+    "Democracy & Governance": ("Strengthen voting / institutions", "Restrict voting / reduce oversight"),
+    "Housing & Affordability": ("Expand housing access / funding", "Cut housing programs / deregulate"),
+    "Healthcare": ("Expand access / coverage", "Reduce / restrict access"),
+    "Individual Rights & Civil Liberties": ("Strengthen rights / protections", "Restrict rights / increase restrictions"),
+    "Crime & Public Safety": ("Expand rehabilitation / prevention", "Increase enforcement / penalties"),
+    "Corruption & Government Accountability": ("Increase transparency / oversight", "Reduce oversight / accountability"),
+    "Social Programs & Safety Net": ("Expand programs / benefits", "Cut / reduce programs"),
+    "Environment & Energy": ("Expand protections / clean energy", "Reduce protections / expand fossil fuels"),
+    "Foreign Policy, War & National Security": ("Diplomatic / reduce military spending", "Military expansion / increase defense spending"),
+    "National Interest & Foreign Influence": ("Prioritizes US interests", "Subordinates US interests to foreign interests"),
+}
 
 def get_engine():
     """
@@ -356,3 +388,108 @@ def load_zip_districts(file_path, engine=None):
                 session.merge(new_zip_district)
 
         session.commit()
+
+def lookup_representative(zip_code, engine=None):
+    """
+    Look up the House representative for a given zip code.
+
+    Args:
+        zip_code (str): 5-digit zip code entered by the user.
+        engine: SQLAlchemy engine. Creates one if not provided.
+
+    Returns:
+        dict: Representative data with keys: member_id, name, party,
+              chamber, image, attribution.
+        dict: {"error": <message>} if zip is invalid or not found.
+        dict: {"vacant": True, "message": <message>} if seat is vacant.
+    """
+
+    zip_code = zip_code.strip()
+
+    if engine is None:
+        engine = get_engine()
+
+    if not re.match(r'^\d{5}$', zip_code):
+        return {"error": "Please enter a valid 5-digit zip code"}
+    
+    with Session(engine) as session:
+
+        zip_district = session.query(ZipDistrict).filter(ZipDistrict.zcta == zip_code).first()
+        if zip_district is None:
+            return {"error": "Please enter a valid zip code"}
+        
+        state_name = FIPS_TO_STATE.get(zip_district.state)
+        if state_name is None:
+            return {"error": "Please enter a valid zip code"}
+        
+        representative = (
+            session.query(Member)
+            .filter(Member.state == state_name)
+            .filter(Member.district == zip_district.district)
+            .first()
+        )
+        if representative is None:
+            return {"vacant": True, "message": "This congressional seat is currently vacant"}
+        
+        rep_dict = {
+            "member_id": representative.member_id,
+            "name": representative.name,
+            "party": representative.party,
+            "chamber": representative.chamber,
+            "image": representative.picture_url,
+            "attribution": representative.photo_cred,
+        }
+
+        return rep_dict
+    
+def get_member_category_scores(member_id, engine=None):
+    
+    if engine is None:
+        engine = get_engine()
+
+    # Create dict countaining scores for each category
+    scores = {}
+    for category, (left, right) in CATEGORY_DIRECTIONS.items():
+        scores[category] = {
+            "left_label": left,
+            "right_label": right,
+            "left_count": 0,
+            "right_count": 0,
+        }
+
+    with Session(engine) as session:
+        # Obtain voting record for specfic member
+        results = (
+            session.query(MemberVote, Category)
+            .join(Vote, MemberVote.vote_id == Vote.vote_id)
+            .join(Category, Vote.vote_id == Category.vote_id)
+            .filter(MemberVote.member_id == member_id)
+            .all()
+        )
+
+        # get category name and direction
+        for member_vote, category in results:
+            cat_name = category.category
+            direction = category.direction
+
+            if cat_name not in scores:
+                continue
+            if direction in ("Not present", "Internal contradiction"):
+                continue
+
+            left_label = scores[cat_name]["left_label"]
+            right_label = scores[cat_name]["right_label"]
+
+            if member_vote.position in ("Aye", "Yea"):
+                if direction == left_label:
+                    scores[cat_name]["left_count"] += 1
+                elif direction == right_label:
+                    scores[cat_name]["right_count"] += 1
+            elif member_vote.position in ("No", "Nay"):
+                if direction == left_label:
+                    scores[cat_name]["right_count"] += 1
+                elif direction == right_label:
+                    scores[cat_name]["left_count"] += 1
+
+    return scores
+

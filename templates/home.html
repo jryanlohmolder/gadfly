@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Gadfly</title>
+    </head>
+    <body>
+        <h1>Find Your Representative</h1>
+        {% if error %}
+            <p style="color: red;">{{ error }}</p>
+        {% endif %}
+        <form action="/" method="post">
+            <input type="text" name="zip_code" placeholder="Enter your zip code">
+            <button type="submit">Search</button>>
+        </form>
+    </body>
+</html>

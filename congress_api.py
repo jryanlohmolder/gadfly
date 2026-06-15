@@ -106,77 +106,68 @@ def get_all_votes(api_key, congress):
 def fetch_member_positions(api_key, congress, session, vote_number):
     """
     Fetch how members of congress voted on piece of legislation.
-
+    
     Args:
         api_key (str): Congress API authentication key.
         congress (int): Congress number (e.g., 118).
         session (int): Session number (1 or 2).
         vote_number (int): Roll call vote number.
-
+    
     Returns:
         list[dict]: a list of dicts, each stating how one member voted
-
+    
     Raises:
-        requests.exceptions.HTTPError: If a non-429 HTTP error is returned.
+        requests.exceptions.HTTPError: If a non-429/non-5xx HTTP error is returned.
         requests.exceptions.RequestException: If a network error occurs.
         requests.exceptions.RetryError: If run_cap number is reached.
     """
     
-    # Initialize Count
     count = 0
     run_cap = 5
-
-    # Set url
     url = f"https://api.congress.gov/v3/house-vote/{congress}/{session}/{vote_number}/members"
-
+    
     while count < run_cap:
         try:
-            # Build request headers
             headers = {"X-API-KEY": api_key}
+            response = requests.get(url, headers=headers)
 
-            # Make a GET request to the members end point
-            response = requests.get(
-                url,
-                headers = headers,
-            )
-
-            # If receive a 429:
             if response.status_code == 429:
-                
-                # Call exponential back off
                 exponential_backoff(count)
-                # Enumerate count
                 count += 1
-
                 if count == run_cap:
                     raise requests.exceptions.RetryError("Max retries exceeded for fetch_member_positions")
-                # Retry from top of loop
                 continue
-                    
-            
-            # Check for other HTTP errors
+
             response.raise_for_status()
 
-            # Extract member vote data
             data = response.json()["houseRollCallVoteMemberVotes"]["results"]
-            
-            # Create empty list of member votes
             member_votes = []
-
             for entry in data:
                 member_vote = {}
                 member_vote["member_id"] = entry["bioguideID"]
                 member_vote["position"] = entry["voteCast"]
-
-                # Add member position to member votes list
                 member_votes.append(member_vote)
-
             return member_votes
 
+        except requests.exceptions.HTTPError as e:
+            if response.status_code >= 500:
+                print(f"Server error: {e}, retrying...", flush=True)
+                exponential_backoff(count)
+                count += 1
+                if count == run_cap:
+                    raise requests.exceptions.RetryError("Max retries exceeded for fetch_member_positions")
+                continue
+            # 400 level error / non-429 error
+            else:
+                raise
 
         except requests.exceptions.RequestException as e:
-            print(f"Network Error {e}")
-            raise
+            print(f"Network error: {e}, retrying...", flush=True)
+            exponential_backoff(count)
+            count += 1
+            if count == run_cap:
+                raise requests.exceptions.RetryError("Max retries exceeded for fetch_member_positions")
+            continue
 
 def fetch_bill_url(api_key, congress, bill_type, bill_number):
     """

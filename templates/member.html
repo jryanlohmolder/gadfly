@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>{{ member.name }}</title>
+    </head>
+    <body>
+        <h1>{{ member.name }}</h1>
+        <p>{{ member.party }} - {{ member.state }}</p>
+        <img src="{{ member.picture_url }}">
+        <p>{{ member.photo_cred }}</p>
+
+        <h2>Voting Profile</h2>
+        {% for category, data in scores.items() %}
+        <div>
+            <h3>{{ category }}</h3>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span>{{ data.left_label }}</span>
+                <div style="width: 300px; background: #ddd; height: 20px; position: relative;">
+                    {% set total = data.left_count + data.right_count %}
+                    {% if total > 0 %}
+                        {% set pct = (data.left_count / total * 100) | int %}
+                    {% else %}
+                        {% set pct = 50 %}
+                    {% endif %}
+                    <p>pct: {{ pct }}, total: {{ total }}</p>
+                    <div style="width: {{ pct }}%; background: blue; height: 100%;"></div>
+                </div>
+                <span>{{ data.right_label }}</span>
+            </div>
+            <p>{{ data.right_label }}</p>
+        </div>
+        {% endfor %}
+    </body>
+</html>

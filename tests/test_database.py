@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from models import Base, Vote, Member, MemberVote, Category, VoteFlag, SponsoredLegislation, CosponsoredLegislation, ZipDistrict
-from database import store_vote, store_member, store_member_vote, store_category, store_vote_flag, store_vote_summary, store_sponsored_legislation, store_cosponsored_legislation, vote_exists, get_unanalyzed_votes, member_exists, load_zip_districts
+from database import store_vote, store_member, store_member_vote, store_category, store_vote_flag, store_vote_summary, store_sponsored_legislation, store_cosponsored_legislation, vote_exists, get_unanalyzed_votes, member_exists, load_zip_districts, lookup_representative
 
 
 # Helpers
@@ -275,7 +275,7 @@ class TestStoreCategory(unittest.TestCase):
         store_category(
             vote_id=self.vote_id,
             category="Healthcare",
-            direction=True,
+            direction="Expands",
             flagged=False,
             engine=self.engine,
         )
@@ -283,7 +283,7 @@ class TestStoreCategory(unittest.TestCase):
             result = session.query(Category).first()
         self.assertEqual(result.vote_id, self.vote_id)
         self.assertEqual(result.category, "Healthcare")
-        self.assertEqual(result.direction, True)
+        self.assertEqual(result.direction, "Expands")
         self.assertEqual(result.flagged, False)
 
     def test_store_category_flagged_true(self):
@@ -879,6 +879,89 @@ class TestLoadZipDistricts(unittest.TestCase):
 
         self.assertEqual(rows[0].district, 0)
         self.assertIsInstance(rows[0].district, int)
+
+
+class TestLookupRepresentative(unittest.TestCase):
+
+    def setUp(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        with Session(self.engine) as session:
+            session.add(ZipDistrict(zcta="10001", state="36", district=12))
+            session.add(Member(
+                member_id="N000002",
+                name="Nadler, Jerrold",
+                state="New York",
+                district=12,
+                party="D",
+                chamber="House of Representatives",
+                picture_url="http://example.com/photo.jpg",
+                photo_cred="Public domain"
+            ))
+            session.commit()
+
+    def test_invalid_zip_letters(self):
+        """
+        Test lookup_representative() returns error for non-numeric zip.
+        Asserts:
+            Returns error dict when zip contains letters.
+        """
+        result = lookup_representative("abcde", engine=self.engine)
+        self.assertIn("error", result)
+
+    def test_invalid_zip_too_short(self):
+        """
+        Test lookup_representative() returns error for zip under 5 digits.
+        Asserts:
+            Returns error dict when zip is too short.
+        """
+        result = lookup_representative("1234", engine=self.engine)
+        self.assertIn("error", result)
+
+    def test_zip_not_in_crosswalk(self):
+        """
+        Test lookup_representative() returns error for zip not in zip_districts.
+        Asserts:
+            Returns error dict when zip has no crosswalk entry.
+        """
+        result = lookup_representative("99999", engine=self.engine)
+        self.assertIn("error", result)
+
+    def test_vacant_seat(self):
+        """
+        Test lookup_representative() returns vacant dict when no member found.
+        Asserts:
+            Returns vacant dict when district exists but has no member.
+        """
+        with Session(self.engine) as session:
+            session.add(ZipDistrict(zcta="20001", state="36", district=99))
+            session.commit()
+        result = lookup_representative("20001", engine=self.engine)
+        self.assertIn("vacant", result)
+
+    def test_happy_path(self):
+        """
+        Test lookup_representative() returns correct rep dict for valid zip.
+        Asserts:
+            Returns dict with correct member_id, name, party, chamber,
+            image, and attribution.
+        """
+        result = lookup_representative("10001", engine=self.engine)
+        self.assertEqual(result["member_id"], "N000002")
+        self.assertEqual(result["name"], "Nadler, Jerrold")
+        self.assertEqual(result["party"], "D")
+        self.assertEqual(result["chamber"], "House of Representatives")
+        self.assertEqual(result["image"], "http://example.com/photo.jpg")
+        self.assertEqual(result["attribution"], "Public domain")
+
+    def test_whitespace_stripped(self):
+        """
+        Test lookup_representative() strips whitespace from zip before validation.
+        Asserts:
+            Returns valid rep dict when zip has leading/trailing whitespace.
+        """
+        result = lookup_representative("  10001  ", engine=self.engine)
+        self.assertEqual(result["member_id"], "N000002")
 
 if __name__ == "__main__":
     unittest.main()

@@ -154,7 +154,10 @@ def categorize_votes(engine, limit=None):
     # Loop over votes
     for vote in votes:
         # Parse the bill text
+        print(f"Categorizing vote {vote['vote_id']}...", flush=True)
         result = anthropic_api.parse_bill_text(vote["bill_text"])
+        print(f"Categories: {list(result['categories'].keys())}", flush=True)
+        print(f"Flags: {list(result['flags'].keys())}", flush=True)
         
         # Store Summary
         database.store_vote_summary(vote["vote_id"], result["summary"], result["chunk_count"], engine)
@@ -185,5 +188,5 @@ def initial_load(congress_api_key, congress):
     load_votes(congress_api_key, congress, engine)
 
 if __name__ == "__main__":
-    congress = 119
-    initial_load(congress_api_key, congress)
+    engine = database.get_engine()
+    categorize_votes(engine, limit=1)

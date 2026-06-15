@@ -5,7 +5,7 @@ import requests
 
 import anthropic
 
-from anthropic_api import parse_bill_text, merge_chunks, strip_absent, CHUNK_SIZE
+from anthropic_api import parse_bill_text, merge_chunks, strip_absent, extract_json, CHUNK_SIZE
 
 class TestParseBillText(unittest.TestCase):
     @patch("anthropic_api.Anthropic")
@@ -836,3 +836,54 @@ class TestAbsentStrip(unittest.TestCase):
 
         # Assertions
         self.assertEqual(stripped_result["flags"], {})
+
+
+class TestExtractJson(unittest.TestCase):
+
+    def _make_response(self, text):
+        """Helper to create a mock response object."""
+        mock_content = MagicMock()
+        mock_content.text = text
+        mock_response = MagicMock()
+        mock_response.content = [mock_content]
+        return mock_response
+
+    def test_clean_json(self):
+        """
+        Test extract_json() parses a clean JSON response with no fences.
+        Asserts:
+            Returns correct parsed dict when response contains plain JSON.
+        """
+        response = self._make_response('{"key": "value"}')
+        result = extract_json(response)
+        self.assertEqual(result, {"key": "value"})
+
+    def test_json_with_json_fence(self):
+        """
+        Test extract_json() strips ```json fences before parsing.
+        Asserts:
+            Returns correct parsed dict when response is wrapped in ```json fences.
+        """
+        response = self._make_response('```json\n{"key": "value"}\n```')
+        result = extract_json(response)
+        self.assertEqual(result, {"key": "value"})
+
+    def test_json_with_plain_fence(self):
+        """
+        Test extract_json() strips plain ``` fences before parsing.
+        Asserts:
+            Returns correct parsed dict when response is wrapped in plain fences.
+        """
+        response = self._make_response('```\n{"key": "value"}\n```')
+        result = extract_json(response)
+        self.assertEqual(result, {"key": "value"})
+
+    def test_malformed_json_raises(self):
+        """
+        Test extract_json() raises JSONDecodeError on malformed JSON.
+        Asserts:
+            JSONDecodeError is raised when response contains invalid JSON.
+        """
+        response = self._make_response('not valid json')
+        with self.assertRaises(json.JSONDecodeError):
+            extract_json(response)

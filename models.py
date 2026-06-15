@@ -97,7 +97,7 @@ class Category(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     vote_id = Column(Integer, ForeignKey("votes.vote_id"), nullable=False)
     category = Column(Text)
-    direction = Column(Boolean)
+    direction = Column(String)
     flagged = Column(Boolean)
 
 class VoteFlag(Base):

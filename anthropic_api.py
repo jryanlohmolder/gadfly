@@ -2,13 +2,12 @@ import copy
 import json
 import os
 import requests
+import time
 
 import anthropic
 from anthropic import Anthropic
 
 from dotenv import load_dotenv
-
-from congress_api import exponential_backoff
 
 load_dotenv()
 
@@ -130,7 +129,7 @@ PARSE_BILL_PROMPT = (
     "- All 12 categories: flagged if the bill pulls in both directions within that category (internal contradiction).\n"
     "- 'Corruption & Government Accountability': also flagged if direction is 'Reduce oversight / accountability'.\n"
     "- 'Individual Rights & Civil Liberties': also flagged if direction is 'Restrict rights / increase restrictions'.\n"
-    "- 'National Interest & Foreign Influence': also flagged if direction is 'Subordinates US interests to foreign interests'.\n\n"
+    "- 'National Interest & Foreign Influence': set to 'Not present' unless the bill explicitly involves a foreign government, international body, or foreign-controlled entity as a direct subject. Domestic bills involving foreign nationals (e.g. voter ID, immigration enforcement) are NOT this category. Flag only if direction is 'Subordinates US interests to foreign interests'.\n\n"
     "Bill-level flag rules (independent of categories):\n"
     "- internal_contradiction: flag if the bill pulls in both directions within any single category.\n"
     "- obfuscation_by_verbosity: flag if BOTH of the following are true: (a) the plain language summary of what this bill does can be stated in 1-2 sentences, AND (b) the bill uses heavy legal jargon, excessive cross-references, or repetitive language that a non-lawyer could not reasonably parse.\n"
@@ -182,7 +181,7 @@ def parse_bill_text(text):
     
     # Count tokens
     token_response = client.messages.count_tokens(
-        model = "claude-sonnet-4-20250514",
+        model = "claude-sonnet-4-6",
         messages = [{"role": "user", "content": PARSE_BILL_PROMPT + text}]
     )
     token_count = token_response.input_tokens
@@ -196,7 +195,7 @@ def parse_bill_text(text):
             try:
                 # Make API call
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=4_000,
                     messages=[{"role": "user", "content": PARSE_BILL_PROMPT + text}]
                 )
@@ -204,7 +203,7 @@ def parse_bill_text(text):
             
             except anthropic.RateLimitError:
                 # Call backoff function
-                exponential_backoff(count)
+                anthropic_backoff(count)
                 # Increase count
                 count += 1
                 if count == run_cap:
@@ -216,12 +215,9 @@ def parse_bill_text(text):
                 print(f"API error: {e}")
                 raise
         
-        # Extract the text from the response
-        raw = response.content[0].text
-        
         # Parse JSON
         try:
-            result = json.loads(raw)
+            result = extract_json(response)
         
         except json.JSONDecodeError as e:
             print(f"JSON parsing error: {e}")
@@ -243,7 +239,7 @@ def parse_bill_text(text):
                 try:
                     # Make API call
                     response = client.messages.create(
-                        model="claude-sonnet-4-20250514",
+                        model="claude-sonnet-4-6",
                         max_tokens=4_000,
                         messages=[{"role": "user", "content": PARSE_BILL_PROMPT + chunk}]
                     )
@@ -251,7 +247,7 @@ def parse_bill_text(text):
                 
                 except anthropic.RateLimitError:
                     # Call backoff function
-                    exponential_backoff(count)
+                    anthropic_backoff(count)
                     # Increase count
                     count += 1
                     if count == run_cap:
@@ -263,12 +259,9 @@ def parse_bill_text(text):
                     print(f"API error: {e}")
                     raise
             
-            # Extract the text from the response
-            raw = response.content[0].text
-            
             # Parse JSON
             try:
-                chunk_result = json.loads(raw)
+                chunk_result = extract_json(response)
             
             except json.JSONDecodeError as e:
                 print(f"JSON parsing error: {e}")
@@ -289,7 +282,7 @@ def parse_bill_text(text):
             try:
                 # Resend combined results to Claude
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=4_000,
                     messages=[{"role": "user", "content": SYNTHESIZE_CHUNKS_PROMPT + json.dumps(combined_result)}]
                 )
@@ -297,7 +290,7 @@ def parse_bill_text(text):
             
             except anthropic.RateLimitError:
                 # Call backoff function
-                exponential_backoff(count)
+                anthropic_backoff(count)
                 # Increase count
                 count += 1
                 
@@ -310,12 +303,10 @@ def parse_bill_text(text):
                 print(f"API error: {e}")
                 raise
         
-        # Extract the text from the response
-        raw = response.content[0].text
-        
         # Parse JSON
         try:
-            result = json.loads(raw)
+            result = extract_json(response)
+        
         except json.JSONDecodeError as e:
             print(f"JSON parsing error: {e}")
             raise
@@ -402,3 +393,18 @@ def strip_absent(result):
             del result["categories"][category]
 
     return result
+
+def extract_json(response):
+    raw = response.content[0].text.strip()
+    if raw.startswith("```"):
+        raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    return json.loads(raw)
+
+def anthropic_backoff(count):
+    """
+    This function is designed to prevent repeated 429 errors specifically for anthropic's api
+
+    Args:
+        count (int): The number of runs repeated because of 429 error
+    """
+    time.sleep(60 * (count + 1))
