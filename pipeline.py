@@ -189,4 +189,4 @@ def initial_load(congress_api_key, congress):
 
 if __name__ == "__main__":
     engine = database.get_engine()
-    categorize_votes(engine, limit=1)
+    categorize_votes(engine, limit=19)

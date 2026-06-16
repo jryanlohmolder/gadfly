@@ -37,13 +37,18 @@ PARSE_BILL_PROMPT = (
     '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
+    '        "subordinates_us_interests": {\n'
+    '            "severity": "caution",\n'
+    '            "present": true | false,\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '        },\n'
     '        "misleading_title": {\n'
-    '            "severity": "red",\n'
+    '            "severity": "caution",\n'
     '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
     '        "obfuscation_by_verbosity": {\n'
-    '            "severity": "red",\n'
+    '            "severity": "caution",\n'
     '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
@@ -53,11 +58,6 @@ PARSE_BILL_PROMPT = (
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
     '        },\n'
     '        "cross_referencing_obfuscation": {\n'
-    '            "severity": "caution",\n'
-    '            "present": true | false,\n'
-    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
-    '        },\n'
-    '        "subordinates_us_interests": {\n'
     '            "severity": "caution",\n'
     '            "present": true | false,\n'
     '            "explanation": "1-2 sentence explanation or null if present is false"\n'
@@ -115,31 +115,29 @@ PARSE_BILL_PROMPT = (
     '            "flagged": true | false\n'
     '        },\n'
     '        "Foreign Policy, War & National Security": {\n'
-    '            "direction": "Diplomatic / reduce military spending" | "Military expansion / increase defense spending" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
-    '        },\n'
-    '        "National Interest & Foreign Influence": {\n'
-    '            "direction": "Prioritizes US interests" | "Subordinates US interests to foreign interests" | "Not present" | "Internal contradiction",\n'
+    '            "direction": "Coercive / military might" | "Diplomatic / de-escalatory" | "Not present" | "Internal contradiction",\n'
     '            "flagged": true | false\n'
     '        }\n'
     '    },\n'
     '    "summary": "Plain language summary of what the bill actually does. Write as long as the bill requires — a simple bill may need one sentence, a complex bill may need a paragraph. Describe only what the bill mechanically changes: what it adds, removes, restricts, allocates, or requires. Do not characterize intent or likely impact."\n'
     "}\n\n"
     "Category flagging rules:\n"
-    "- All 12 categories: flagged if the bill pulls in both directions within that category (internal contradiction).\n"
+    "- All 11 categories: flagged if the bill pulls in both directions within that category (internal contradiction).\n"
     "- 'Corruption & Government Accountability': also flagged if direction is 'Reduce oversight / accountability'.\n"
-    "- 'Individual Rights & Civil Liberties': also flagged if direction is 'Restrict rights / increase restrictions'.\n"
-    "- 'National Interest & Foreign Influence': set to 'Not present' unless the bill explicitly involves a foreign government, international body, or foreign-controlled entity as a direct subject. Domestic bills involving foreign nationals (e.g. voter ID, immigration enforcement) are NOT this category. Flag only if direction is 'Subordinates US interests to foreign interests'.\n\n"
+    "- 'Individual Rights & Civil Liberties': also flagged if direction is 'Restrict rights / increase restrictions'.\n\n"
+    "Category scope rules:\n"
+    "- 'Democracy & Governance': Apply only to bills that directly affect elections, voting rights, electoral processes, campaign finance, or the structural integrity of democratic institutions (e.g. separation of powers, congressional oversight bodies, ethics enforcement). Bills that regulate agency behavior within normal administrative functions are NOT this category, even if they increase agency reporting or oversight.\n"
+    "- 'Foreign Policy, War & National Security': Apply only to bills concerning the United States' posture toward foreign nations, foreign conflicts, or international bodies — including military force projection (weapons systems, troop deployments), foreign military or humanitarian aid, sanctions, embargoes, treaties, and diplomatic agreements. Do NOT apply to bills about the military as a domestic institution — service member pay, veterans' benefits, military healthcare, or base administration — when these have no foreign-facing dimension. 'Coercive / military might' covers force projection, sanctions, embargoes, and military buildup; 'Diplomatic / de-escalatory' covers diplomacy, treaties, foreign aid, and de-escalation.\n\n"
     "Bill-level flag rules (independent of categories):\n"
-    "- internal_contradiction: flag if the bill pulls in both directions within any single category.\n"
+    "- corruption_or_reduced_oversight: flag if the bill removes, weakens, or limits any existing mechanism for government accountability or oversight. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n"
+    "- restricts_individual_rights: flag if the bill removes, limits, or adds new restrictions on rights or liberties currently held by individuals. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n"
+    "- subordinates_us_interests: flag if the bill grants, transfers, or defers any authority, resource, or legal obligation to a foreign government, international body, or foreign-controlled entity in a way that limits US autonomy or prioritizes foreign interests over domestic ones. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n"
+    "- misleading_title: flag if the bill's title does not accurately represent its content.\n"
     "- obfuscation_by_verbosity: flag if BOTH of the following are true: (a) the plain language summary of what this bill does can be stated in 1-2 sentences, AND (b) the bill uses heavy legal jargon, excessive cross-references, or repetitive language that a non-lawyer could not reasonably parse.\n"
     "- riders: flag if unrelated provisions are attached to the bill.\n"
     "- cross_referencing_obfuscation: flag if the bill relies heavily on references to other legislation without plain language explanation.\n"
-    "- sunset_clauses: flag if provisions expire after a defined period without clear plain language notice.\n"
-    "- misleading_title: flag if the bill's title does not accurately represent its content.\n"
-    "- corruption_or_reduced_oversight: flag if the bill removes, weakens, or limits any existing mechanism for government accountability or oversight. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n"
-    "- restricts_individual_rights: flag if the bill removes, limits, or adds new restrictions on rights or liberties currently held by individuals. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n"
-    "- subordinates_us_interests: flag if the bill grants, transfers, or defers any authority, resource, or legal obligation to a foreign government, international body, or foreign-controlled entity in a way that limits US autonomy or prioritizes foreign interests over domestic ones. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n\n"
+    "- internal_contradiction: flag if the bill pulls in both directions within any single category.\n"
+    "- sunset_clauses: flag if provisions expire after a defined period without clear plain language notice.\n\n"
     "BILL TEXT:\n"
 )
 

@@ -45,8 +45,7 @@ CATEGORY_DIRECTIONS = {
     "Corruption & Government Accountability": ("Increase transparency / oversight", "Reduce oversight / accountability"),
     "Social Programs & Safety Net": ("Expand programs / benefits", "Cut / reduce programs"),
     "Environment & Energy": ("Expand protections / clean energy", "Reduce protections / expand fossil fuels"),
-    "Foreign Policy, War & National Security": ("Diplomatic / reduce military spending", "Military expansion / increase defense spending"),
-    "National Interest & Foreign Influence": ("Prioritizes US interests", "Subordinates US interests to foreign interests"),
+    "Foreign Policy, War & National Security": ("Diplomatic / de-escalatory", "Coercive / military might"),
 }
 
 def get_engine():
@@ -443,6 +442,31 @@ def lookup_representative(zip_code, engine=None):
         return rep_dict
     
 def get_member_category_scores(member_id, engine=None):
+    """
+    Tallies a member's directional lean within each policy category.
+
+    For the given member, joins their recorded votes to the categories
+    assigned to each bill and counts, per category, how many votes fall
+    toward each of the two directional ends. A vote's contribution depends
+    on both how the member voted and which way the bill pushes: an Aye/Yea
+    on a bill pushing a direction counts toward that direction, while a
+    No/Nay counts toward the opposite end. Positions other than
+    Aye/Yea/No/Nay (e.g. 'Not Voting') are ignored, as are categories with
+    a direction of 'Not present' or 'Internal contradiction'.
+
+    Args:
+        member_id (str): Bioguide ID of the member.
+        engine: SQLAlchemy engine. Creates one if not provided.
+
+    Returns:
+        dict: Maps each category name to a dict with keys left_label (str),
+            right_label (str), left_count (int), and right_count (int).
+            Every category in CATEGORY_DIRECTIONS is present, with zero
+            counts when the member has no qualifying votes.
+
+    Raises:
+        sqlalchemy.exc.SQLAlchemyError: If the query fails.
+    """
     
     if engine is None:
         engine = get_engine()

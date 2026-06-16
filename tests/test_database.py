@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from models import Base, Vote, Member, MemberVote, Category, VoteFlag, SponsoredLegislation, CosponsoredLegislation, ZipDistrict
-from database import store_vote, store_member, store_member_vote, store_category, store_vote_flag, store_vote_summary, store_sponsored_legislation, store_cosponsored_legislation, vote_exists, get_unanalyzed_votes, member_exists, load_zip_districts, lookup_representative
+from database import store_vote, store_member, store_member_vote, store_category, store_vote_flag, store_vote_summary, store_sponsored_legislation, store_cosponsored_legislation, vote_exists, get_unanalyzed_votes, member_exists, load_zip_districts, lookup_representative, get_member_category_scores, CATEGORY_DIRECTIONS
 
 
 # Helpers
@@ -41,7 +41,29 @@ def make_member(engine, member_id="A000001"):
         session.add(member)
         session.commit()
         return member.member_id
+    
+def make_scored_vote(engine, member_id, category, direction, position, roll_call_number):
+    """Creates a vote, attaches one category with a direction, and records the member's position. Returns vote_id."""
+    
+    with Session(engine) as session:
+        vote = Vote(
+            congress=119,
+            session=1,
+            roll_call_number=roll_call_number,
+            legislation_number=f"HR {roll_call_number}",
+            legislation_type="HR",
+            result="Passed",
+            date=date(2025, 1, 1),
+        )
+        session.add(vote)
+        session.commit()
+        session.refresh(vote)
+        vote_id = vote.vote_id
 
+        session.add(Category(vote_id=vote_id, category=category, direction=direction, flagged=False))
+        session.add(MemberVote(member_id=member_id, vote_id=vote_id, position=position))
+        session.commit()
+    return vote_id
 
 # Tests
 
@@ -344,7 +366,7 @@ class TestStoreVoteFlag(unittest.TestCase):
         store_vote_flag(
             vote_id=self.vote_id,
             flag_name="misleading_title",
-            severity="red",
+            severity="caution",
             explanation="The title says 'Protect Children Act' but the body restricts voting access.",
             engine=self.engine,
         )
@@ -352,13 +374,13 @@ class TestStoreVoteFlag(unittest.TestCase):
             result = session.query(VoteFlag).first()
         self.assertEqual(result.vote_id, self.vote_id)
         self.assertEqual(result.flag_name, "misleading_title")
-        self.assertEqual(result.severity, "red")
+        self.assertEqual(result.severity, "caution")
         self.assertIn("title", result.explanation)
 
     def test_store_vote_flag_all_severities(self):
         """Verifies store_vote_flag() correctly stores each severity tier: red, caution, informational."""
         flags = [
-            ("misleading_title", "red", "Title does not match content."),
+            ("restricts_individual_rights", "red", "Prevents individuals right to privacy."),
             ("riders", "caution", "Unrelated provision attached to bill."),
             ("sunset_clauses", "informational", "Provision expires in 2 years without notice."),
         ]
@@ -962,6 +984,95 @@ class TestLookupRepresentative(unittest.TestCase):
         """
         result = lookup_representative("  10001  ", engine=self.engine)
         self.assertEqual(result["member_id"], "N000002")
+
+
+class TestGetMemberCategoryScores(unittest.TestCase):
+
+    def setUp(self):
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.member_id = make_member(self.engine)
+
+    def test_returns_all_categories(self):
+        """Verifies the result has an entry for every category in CATEGORY_DIRECTIONS."""
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(set(scores.keys()), set(CATEGORY_DIRECTIONS.keys()))
+
+    def test_no_votes_all_zero(self):
+        """Verifies a member with no votes gets zero counts in every category."""
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        for data in scores.values():
+            self.assertEqual(data["left_count"], 0)
+            self.assertEqual(data["right_count"], 0)
+
+    def test_aye_on_left_direction_counts_left(self):
+        """Verifies an Aye on a bill pushing the left direction increments left_count."""
+        make_scored_vote(self.engine, self.member_id, "Healthcare", "Expand access / coverage", "Aye", 1)
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(scores["Healthcare"]["left_count"], 1)
+        self.assertEqual(scores["Healthcare"]["right_count"], 0)
+
+    def test_nay_on_left_direction_counts_right(self):
+        """Verifies a Nay on a left-direction bill increments right_count (the vote inverts the direction)."""
+        make_scored_vote(self.engine, self.member_id, "Healthcare", "Expand access / coverage", "Nay", 1)
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(scores["Healthcare"]["left_count"], 0)
+        self.assertEqual(scores["Healthcare"]["right_count"], 1)
+
+    def test_yea_treated_as_aye(self):
+        """Verifies 'Yea' counts identically to 'Aye'."""
+        make_scored_vote(self.engine, self.member_id, "Healthcare", "Expand access / coverage", "Yea", 1)
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(scores["Healthcare"]["left_count"], 1)
+
+    def test_no_treated_as_nay(self):
+        """Verifies 'No' counts identically to 'Nay'."""
+        make_scored_vote(self.engine, self.member_id, "Healthcare", "Reduce / restrict access", "No", 1)
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(scores["Healthcare"]["left_count"], 1)
+
+    def test_not_voting_is_skipped(self):
+        """Verifies a 'Not Voting' position does not change any count."""
+        make_scored_vote(self.engine, self.member_id, "Healthcare", "Expand access / coverage", "Not Voting", 1)
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(scores["Healthcare"]["left_count"], 0)
+        self.assertEqual(scores["Healthcare"]["right_count"], 0)
+
+    def test_not_present_direction_skipped(self):
+        """Verifies a category direction of 'Not present' is ignored."""
+        make_scored_vote(self.engine, self.member_id, "Healthcare", "Not present", "Aye", 1)
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(scores["Healthcare"]["left_count"], 0)
+        self.assertEqual(scores["Healthcare"]["right_count"], 0)
+
+    def test_internal_contradiction_direction_skipped(self):
+        """Verifies a category direction of 'Internal contradiction' is ignored."""
+        make_scored_vote(self.engine, self.member_id, "Healthcare", "Internal contradiction", "Aye", 1)
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(scores["Healthcare"]["left_count"], 0)
+        self.assertEqual(scores["Healthcare"]["right_count"], 0)
+
+    def test_counts_accumulate_across_votes(self):
+        """Verifies multiple votes in the same category accumulate into the totals."""
+        make_scored_vote(self.engine, self.member_id, "Economy & Cost of Living", "Expand spending / stimulus", "Aye", 1)
+        make_scored_vote(self.engine, self.member_id, "Economy & Cost of Living", "Expand spending / stimulus", "Aye", 2)
+        make_scored_vote(self.engine, self.member_id, "Economy & Cost of Living", "Cut spending / austerity", "Aye", 3)
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(scores["Economy & Cost of Living"]["left_count"], 2)
+        self.assertEqual(scores["Economy & Cost of Living"]["right_count"], 1)
+
+    def test_only_target_member_counted(self):
+        """Verifies votes cast by other members do not affect this member's scores."""
+        other_id = make_member(self.engine, member_id="Z000999")
+        make_scored_vote(self.engine, other_id, "Healthcare", "Expand access / coverage", "Aye", 1)
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(scores["Healthcare"]["left_count"], 0)
+
+    def test_new_foreign_policy_labels(self):
+        """Verifies the relabeled Foreign Policy directions tally correctly."""
+        make_scored_vote(self.engine, self.member_id, "Foreign Policy, War & National Security", "Coercive / military might", "Aye", 1)
+        scores = get_member_category_scores(self.member_id, engine=self.engine)
+        self.assertEqual(scores["Foreign Policy, War & National Security"]["right_count"], 1)
 
 if __name__ == "__main__":
     unittest.main()
