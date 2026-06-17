@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Your Represenatives</title>
+    </head>
+    <body>
+        <h1>Your Represenatives</h1>
+        {% for member in members %}
+        <div>
+            <img src="{{ member.image }}" width="100">
+            <h2><a href="{{ url_for('member_profile', member_id=member['member_id']) }}">{{ member.name }}</a></h2>
+            <p>{{ member.party }} - {{ member.chamber }}</p>
+        </div>
+        {% endfor %}
+    </body>
+</html>

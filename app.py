@@ -13,16 +13,15 @@ def home():
         zip_code = request.form["zip_code"]
 
         # Get house represenative from zip code
-        member_dict = lookup_representative(zip_code)
+        result = lookup_representative(zip_code)
         
-        if "error" in member_dict:
-            return render_template("home.html", error=member_dict["error"])
+        if "error" in result[0]:
+            return render_template("home.html", error=result[0]["error"])
         
-        if "vacant" in member_dict:
-            return render_template("home.html", error=member_dict["message"])
-        
-        member_id = member_dict["member_id"] 
-        return redirect(url_for("member_profile", member_id=member_id))
+        if "vacant" in result[0]:
+            return render_template("home.html", error=result[0]["message"])
+         
+        return render_template("results.html", members=result)
     
     return render_template("home.html")
 

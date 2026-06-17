@@ -1,4 +1,6 @@
+import html
 import os
+import re
 import requests
 import time
 
@@ -283,7 +285,11 @@ def fetch_bill_text(bill_url):
             if not response.text or not response.text.strip():
                 raise ValueError(f"Empty response body from {bill_url}")
             
-            return response.text
+            # Strip HTML tags and unescape HTML entities
+            text = re.sub(r'<[^>]+>', '', response.text)
+            text = html.unescape(text)
+            
+            return text
 
         except requests.exceptions.RequestException as e:
             print(f"Network Error {e}")

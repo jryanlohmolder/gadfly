@@ -390,17 +390,17 @@ def load_zip_districts(file_path, engine=None):
 
 def lookup_representative(zip_code, engine=None):
     """
-    Look up the House representative for a given zip code.
-
+    Look up the House and Senate representatives for a given zip code.
+    
     Args:
         zip_code (str): 5-digit zip code entered by the user.
         engine: SQLAlchemy engine. Creates one if not provided.
-
+    
     Returns:
-        dict: Representative data with keys: member_id, name, party,
-              chamber, image, attribution.
+        list[dict]: List of three member dicts (House rep first, then two senators),
+                    each with keys: member_id, name, party, chamber, image, attribution.
         dict: {"error": <message>} if zip is invalid or not found.
-        dict: {"vacant": True, "message": <message>} if seat is vacant.
+        dict: {"vacant": True, "message": <message>} if a seat is vacant.
     """
 
     zip_code = zip_code.strip()
@@ -421,25 +421,62 @@ def lookup_representative(zip_code, engine=None):
         if state_name is None:
             return {"error": "Please enter a valid zip code"}
         
-        representative = (
+        # Get house represenatative
+        house_representative = (
             session.query(Member)
             .filter(Member.state == state_name)
             .filter(Member.district == zip_district.district)
             .first()
         )
-        if representative is None:
-            return {"vacant": True, "message": "This congressional seat is currently vacant"}
+
+        # Get senate represenatatives
+        senate_representatives = (
+            session.query(Member)
+            .filter(Member.state == state_name)
+            .filter(Member.chamber == "Senate")
+            .all()
+        )
+
+        # Handle empty house-rep queries and make house-rep dict
+        if house_representative is None:
+            return [{"vacant": True, "message": "This congressional house seat is currently vacant"}]
         
-        rep_dict = {
-            "member_id": representative.member_id,
-            "name": representative.name,
-            "party": representative.party,
-            "chamber": representative.chamber,
-            "image": representative.picture_url,
-            "attribution": representative.photo_cred,
+        house_rep_dict = {
+            "member_id": house_representative.member_id,
+            "name": house_representative.name,
+            "party": house_representative.party,
+            "chamber": house_representative.chamber,
+            "image": house_representative.picture_url,
+            "attribution": house_representative.photo_cred,
         }
 
-        return rep_dict
+        # Handle empty senate-rep queries and make senate-rep dict
+        senate_reps = []
+
+        for rep in senate_representatives:
+            
+            senate_rep = {
+                "member_id": rep.member_id,
+                "name": rep.name,
+                "party": rep.party,
+                "chamber": rep.chamber,
+                "image": rep.picture_url,
+                "attribution": rep.photo_cred,
+            }
+
+            senate_reps.append(senate_rep)
+
+        # Unpack senator list
+        if len(senate_reps) == 2:
+            senate_rep_dict_1, senate_rep_dict_2 = senate_reps[0], senate_reps[1]
+        
+        # Handle missing senators
+        elif len(senate_reps) == 1:
+            return [{"vacant": True, "message": "One Senate seat for this state is currently vacant"}]
+        else:
+            return [{"error": "Could not find senators for this state"}]
+
+        return [house_rep_dict, senate_rep_dict_1, senate_rep_dict_2]
     
 def get_member_category_scores(member_id, engine=None):
     """

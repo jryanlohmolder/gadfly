@@ -126,8 +126,17 @@ PARSE_BILL_PROMPT = (
     "- 'Corruption & Government Accountability': also flagged if direction is 'Reduce oversight / accountability'.\n"
     "- 'Individual Rights & Civil Liberties': also flagged if direction is 'Restrict rights / increase restrictions'.\n\n"
     "Category scope rules:\n"
+    "- 'Economy & Cost of Living': Apply only to bills that change government spending, taxation, appropriations, or fiscal/monetary policy. The binary measures government fiscal posture (stimulus vs. austerity); deregulation or rule repeals that do not alter government spending are NOT this category.\n"
+    "- 'Immigration & Border Security': Apply only to bills that change US immigration law, visas for general entry, border security, asylum, naturalization, or enforcement against unlawful presence. Targeted visa bans on specific foreign officials as a sanctions tool are NOT this category — those are Foreign Policy.\n"
     "- 'Democracy & Governance': Apply only to bills that directly affect elections, voting rights, electoral processes, campaign finance, or the structural integrity of democratic institutions (e.g. separation of powers, congressional oversight bodies, ethics enforcement). Bills that regulate agency behavior within normal administrative functions are NOT this category, even if they increase agency reporting or oversight.\n"
-    "- 'Foreign Policy, War & National Security': Apply only to bills concerning the United States' posture toward foreign nations, foreign conflicts, or international bodies — including military force projection (weapons systems, troop deployments), foreign military or humanitarian aid, sanctions, embargoes, treaties, and diplomatic agreements. Do NOT apply to bills about the military as a domestic institution — service member pay, veterans' benefits, military healthcare, or base administration — when these have no foreign-facing dimension. 'Coercive / military might' covers force projection, sanctions, embargoes, and military buildup; 'Diplomatic / de-escalatory' covers diplomacy, treaties, foreign aid, and de-escalation.\n\n"
+    "- 'Housing & Affordability': Apply only to bills where housing supply, housing finance, rental or homeownership assistance, zoning, or housing affordability is a primary subject.\n"
+    "- 'Healthcare': Apply only to bills that change healthcare access, coverage, cost, delivery, or regulation. Bills that merely commission a study or report on a health topic without changing access or coverage are NOT this category.\n"
+    "- 'Individual Rights & Civil Liberties': Apply only to bills that expand or restrict civil liberties, constitutional rights, due process, privacy, or anti-discrimination protections of persons in the US. Entry or visa restrictions on foreign nationals abroad are NOT this category.\n"
+    "- 'Crime & Public Safety': Apply only to bills that change criminal law, penalties, policing, incarceration, rehabilitation, or public-safety programs. Administrative oversight or contractor-management bills that do not change criminal justice policy are NOT this category.\n"
+    "- 'Corruption & Government Accountability': Apply to bills that create, strengthen, weaken, or remove mechanisms for government transparency, oversight, ethics, or accountability.\n"
+    "- 'Social Programs & Safety Net': Apply only to bills that expand, cut, or modify social welfare, public benefits, or safety-net programs (e.g. SNAP, Medicaid, housing assistance, unemployment, veterans' benefits). Funding restrictions imposed for unrelated policy reasons, or bills that merely commission studies, are NOT this category.\n"
+    "- 'Environment & Energy': Apply to bills that change environmental protection, pollution regulation, energy production, conservation, or climate policy.\n"
+    "- 'Foreign Policy, War & National Security': Apply only to bills whose primary action is foreign-facing: military force projection (weapons systems, troop deployments, defense spending), foreign military or humanitarian aid, sanctions or embargoes against a foreign government or entity, treaties, or diplomatic agreements. The action must operate on a foreign government, military, or territory. Bills that act domestically — conditioning or restricting US funding, programs, or institutions — are NOT this category, even when the motivation is countering a foreign government's influence. Do NOT apply to bills about the military as a domestic institution (service member pay, veterans' benefits, military healthcare, base administration). 'Coercive / military might' covers force projection, sanctions, and embargoes; 'Diplomatic / de-escalatory' covers diplomacy, treaties, foreign aid, and de-escalation.\n\n"    
     "Bill-level flag rules (independent of categories):\n"
     "- corruption_or_reduced_oversight: flag if the bill removes, weakens, or limits any existing mechanism for government accountability or oversight. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n"
     "- restricts_individual_rights: flag if the bill removes, limits, or adds new restrictions on rights or liberties currently held by individuals. Describe only what is mechanically changed — do not characterize whether the change is good or bad.\n"
@@ -175,7 +184,7 @@ def parse_bill_text(text):
         Anthropic.APIError: If a non-429 API error is returned.
     """
      
-    client = Anthropic()
+    client = Anthropic(default_headers={"anthropic-beta": "prompt-caching-2024-07-31"}, max_retries=5, timeout=300.0)
     
     # Count tokens
     token_response = client.messages.count_tokens(
@@ -194,8 +203,12 @@ def parse_bill_text(text):
                 # Make API call
                 response = client.messages.create(
                     model="claude-sonnet-4-6",
-                    max_tokens=4_000,
-                    messages=[{"role": "user", "content": PARSE_BILL_PROMPT + text}]
+                    max_tokens=8_000,
+                    temperature=0,
+                    messages=[{"role": "user", "content": [
+                        {"type": "text", "text": PARSE_BILL_PROMPT, "cache_control": {"type": "ephemeral"}},
+                        {"type": "text", "text": text}
+                    ]}]
                 )
                 break
             
@@ -207,6 +220,14 @@ def parse_bill_text(text):
                 if count == run_cap:
                     raise requests.exceptions.RetryError("Max retries exceeded")
                 # Retry from top of loop
+                continue
+
+            except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
+                print(f"API error: {e}", flush=True)
+                anthropic_backoff(count)
+                count += 1
+                if count == run_cap:
+                    raise requests.exceptions.RetryError("Max retries exceeded")
                 continue
             
             except anthropic.APIError as e:
@@ -238,8 +259,12 @@ def parse_bill_text(text):
                     # Make API call
                     response = client.messages.create(
                         model="claude-sonnet-4-6",
-                        max_tokens=4_000,
-                        messages=[{"role": "user", "content": PARSE_BILL_PROMPT + chunk}]
+                        max_tokens=8_000,
+                        temperature=0,
+                        messages=[{"role": "user", "content": [
+                            {"type": "text", "text": PARSE_BILL_PROMPT, "cache_control": {"type": "ephemeral"}},
+                            {"type": "text", "text": chunk}
+                        ]}]
                     )
                     break
                 
@@ -251,6 +276,14 @@ def parse_bill_text(text):
                     if count == run_cap:
                         raise requests.exceptions.RetryError("Max retries exceeded")
                     # Retry from top of loop
+                    continue
+
+                except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
+                    print(f"API error: {e}", flush=True)
+                    anthropic_backoff(count)
+                    count += 1
+                    if count == run_cap:
+                        raise requests.exceptions.RetryError("Max retries exceeded")
                     continue
                 
                 except anthropic.APIError as e:
@@ -281,7 +314,8 @@ def parse_bill_text(text):
                 # Resend combined results to Claude
                 response = client.messages.create(
                     model="claude-sonnet-4-6",
-                    max_tokens=4_000,
+                    max_tokens=8_000,
+                    temperature=0,
                     messages=[{"role": "user", "content": SYNTHESIZE_CHUNKS_PROMPT + json.dumps(combined_result)}]
                 )
                 break
@@ -295,6 +329,14 @@ def parse_bill_text(text):
                 if count == run_cap:
                     raise requests.exceptions.RetryError("Max retries exceeded")
                 # Retry from top of loop
+                continue
+
+            except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
+                print(f"API error: {e}", flush=True)
+                anthropic_backoff(count)
+                count += 1
+                if count == run_cap:
+                    raise requests.exceptions.RetryError("Max retries exceeded")
                 continue
             
             except anthropic.APIError as e:
@@ -393,7 +435,27 @@ def strip_absent(result):
     return result
 
 def extract_json(response):
+    """
+    Parse the JSON object out of a Claude API response.
+
+    Strips surrounding markdown code fences if the model wrapped its
+    output in them, then parses the remaining text.
+
+    Args:
+        response: Anthropic Messages API response. JSON is read from
+            response.content[0].text.
+
+    Returns:
+        dict: The parsed analysis (flags, categories, summary, ...).
+
+    Raises:
+        json.JSONDecodeError: If the text is not valid JSON, most often
+            because the model's output was truncated — check
+            response.stop_reason == "max_tokens".
+    """
+
     raw = response.content[0].text.strip()
+    
     if raw.startswith("```"):
         raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     return json.loads(raw)

@@ -904,7 +904,6 @@ class TestLoadZipDistricts(unittest.TestCase):
 
 
 class TestLookupRepresentative(unittest.TestCase):
-
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
@@ -920,6 +919,26 @@ class TestLookupRepresentative(unittest.TestCase):
                 picture_url="http://example.com/photo.jpg",
                 photo_cred="Public domain"
             ))
+            session.add(Member(
+                member_id="S000001",
+                name="Schumer, Chuck",
+                state="New York",
+                district=None,
+                party="D",
+                chamber="Senate",
+                picture_url="http://example.com/schumer.jpg",
+                photo_cred="Public domain"
+            ))
+            session.add(Member(
+                member_id="G000002",
+                name="Gillibrand, Kirsten",
+                state="New York",
+                district=None,
+                party="D",
+                chamber="Senate",
+                picture_url="http://example.com/gillibrand.jpg",
+                photo_cred="Public domain"
+            ))
             session.commit()
 
     def test_invalid_zip_letters(self):
@@ -928,6 +947,7 @@ class TestLookupRepresentative(unittest.TestCase):
         Asserts:
             Returns error dict when zip contains letters.
         """
+        
         result = lookup_representative("abcde", engine=self.engine)
         self.assertIn("error", result)
 
@@ -937,6 +957,7 @@ class TestLookupRepresentative(unittest.TestCase):
         Asserts:
             Returns error dict when zip is too short.
         """
+        
         result = lookup_representative("1234", engine=self.engine)
         self.assertIn("error", result)
 
@@ -946,44 +967,90 @@ class TestLookupRepresentative(unittest.TestCase):
         Asserts:
             Returns error dict when zip has no crosswalk entry.
         """
+        
         result = lookup_representative("99999", engine=self.engine)
         self.assertIn("error", result)
 
-    def test_vacant_seat(self):
+    def test_vacant_house_seat(self):
         """
-        Test lookup_representative() returns vacant dict when no member found.
+        Test lookup_representative() returns vacant dict when no House member found.
         Asserts:
-            Returns vacant dict when district exists but has no member.
+            Returns vacant dict when district exists but has no House member.
         """
+        
         with Session(self.engine) as session:
             session.add(ZipDistrict(zcta="20001", state="36", district=99))
             session.commit()
         result = lookup_representative("20001", engine=self.engine)
         self.assertIn("vacant", result)
 
+    def test_vacant_senate_seat(self):
+        """
+        Test lookup_representative() returns vacant dict when only one senator found.
+        Asserts:
+            Returns vacant dict when state has only one senator in database.
+        """
+        
+        with Session(self.engine) as session:
+            session.add(ZipDistrict(zcta="30001", state="13", district=1))
+            session.add(Member(
+                member_id="H000001",
+                name="House, Rep",
+                state="Georgia",
+                district=1,
+                party="R",
+                chamber="House of Representatives",
+                picture_url="http://example.com/photo.jpg",
+                photo_cred="Public domain"
+            ))
+            session.add(Member(
+                member_id="S000099",
+                name="Senator, One",
+                state="Georgia",
+                district=None,
+                party="R",
+                chamber="Senate",
+                picture_url="http://example.com/photo.jpg",
+                photo_cred="Public domain"
+            ))
+            session.commit()
+        result = lookup_representative("30001", engine=self.engine)
+        self.assertIn("vacant", result)
+
     def test_happy_path(self):
         """
-        Test lookup_representative() returns correct rep dict for valid zip.
+        Test lookup_representative() returns list of three member dicts for valid zip.
         Asserts:
-            Returns dict with correct member_id, name, party, chamber,
-            image, and attribution.
+            Returns list of length 3.
+            First item is House rep with correct fields.
+            Remaining two items are senators.
         """
+        
         result = lookup_representative("10001", engine=self.engine)
-        self.assertEqual(result["member_id"], "N000002")
-        self.assertEqual(result["name"], "Nadler, Jerrold")
-        self.assertEqual(result["party"], "D")
-        self.assertEqual(result["chamber"], "House of Representatives")
-        self.assertEqual(result["image"], "http://example.com/photo.jpg")
-        self.assertEqual(result["attribution"], "Public domain")
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 3)
+        house_rep = result[0]
+        self.assertEqual(house_rep["member_id"], "N000002")
+        self.assertEqual(house_rep["name"], "Nadler, Jerrold")
+        self.assertEqual(house_rep["party"], "D")
+        self.assertEqual(house_rep["chamber"], "House of Representatives")
+        self.assertEqual(house_rep["image"], "http://example.com/photo.jpg")
+        self.assertEqual(house_rep["attribution"], "Public domain")
+        senators = result[1:]
+        senator_ids = {s["member_id"] for s in senators}
+        self.assertIn("S000001", senator_ids)
+        self.assertIn("G000002", senator_ids)
 
     def test_whitespace_stripped(self):
         """
         Test lookup_representative() strips whitespace from zip before validation.
         Asserts:
-            Returns valid rep dict when zip has leading/trailing whitespace.
+            Returns valid list when zip has leading/trailing whitespace.
         """
+        
         result = lookup_representative("  10001  ", engine=self.engine)
-        self.assertEqual(result["member_id"], "N000002")
+        self.assertIsInstance(result, list)
+        self.assertEqual(result[0]["member_id"], "N000002")
 
 
 class TestGetMemberCategoryScores(unittest.TestCase):
