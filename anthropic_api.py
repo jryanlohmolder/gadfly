@@ -14,7 +14,7 @@ load_dotenv()
 # Constants
 API_KEY = os.getenv("ANTHROPIC_API_KEY")
 MAX_BILL_TOKENS = 180_000
-CHUNK_SIZE = 720_000
+CHUNK_SIZE = 200_000
 
 PARSE_BILL_PROMPT = (
     "You are a nonpartisan bill analysis tool. Analyze the bill text provided "
@@ -192,6 +192,7 @@ def parse_bill_text(text):
         messages = [{"role": "user", "content": PARSE_BILL_PROMPT + text}]
     )
     token_count = token_response.input_tokens
+    print(f"Vote token count: {token_count}", flush=True) 
 
     if token_count <= MAX_BILL_TOKENS:
          # Initialize count
@@ -224,7 +225,7 @@ def parse_bill_text(text):
 
             except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
                 print(f"API error: {e}", flush=True)
-                anthropic_backoff(count)
+                time.sleep(5)
                 count += 1
                 if count == run_cap:
                     raise requests.exceptions.RetryError("Max retries exceeded")
@@ -280,7 +281,7 @@ def parse_bill_text(text):
 
                 except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
                     print(f"API error: {e}", flush=True)
-                    anthropic_backoff(count)
+                    time.sleep(5)
                     count += 1
                     if count == run_cap:
                         raise requests.exceptions.RetryError("Max retries exceeded")
@@ -333,7 +334,7 @@ def parse_bill_text(text):
 
             except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
                 print(f"API error: {e}", flush=True)
-                anthropic_backoff(count)
+                time.sleep(5)
                 count += 1
                 if count == run_cap:
                     raise requests.exceptions.RetryError("Max retries exceeded")

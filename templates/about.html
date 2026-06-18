@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>About Gadfly</title>
+    </head>
+    <body>
+        <nav style="text-align: right;">
+            <a href="{{ url_for('home') }}">Home</a> |
+            <a href="{{ url_for('about_page') }}">About</a> |
+            <a href="{{ url_for('prompt_page') }}">Prompts</a>
+        </nav>
+        <h1 style="text-align: center;">About Gadfly</h1>
+        <div style="padding-top: 25px;">
+            <p>
+                <h3>What is Gadfly?</h3>
+                Gadfly is an open source civic transparency tool built to show everdday Americans whether
+                their congressional representatives actually represent them<br><br>
+                <h3>How it works</h3>
+                Enter your zip code and Gadfly finds your House representative and two senators. For each
+                representative, we analyze their voting records across 11 policy categories selected for their
+                impact on the daily lives of most Americans. This like healthcare, housing, individual rights,
+                and government accountability. Each bill for the 119th Congress is analyzed using
+                AI to determine which categoreis it touches and which directions it moves<br><br>
+                <h3>Carrots & Sticks</h3>
+                We highlight both the good and the bad. The legislation pages show where a representative
+                sponsored, cosponsored, or voted for bills that raised red flags, and where they stood up
+                for transparency, individual rights, and their constituents' interests. The goal is simple: give
+                represenatives an incentive to actually who elected them.<br><br>
+                <h3>Open Source</h3>
+                Gadfly is an open source project. Contributions, data sharing, and feature suggestions are
+                welcome.
+            </p><br>
+            <h2 style="text-align: center;">Method Behind the Madness</h2>
+                <ul>
+                    <li><strong>House Voting Data Obtained from Congress Api - <a href="https://api.congress.gov/">Congress API</a></strong></li>
+                    <li><strong>Senate Voting Data Obtained from </strong> - This feature is coming in the future</li>
+                    <li><strong>Member & Vote Data</strong> — All congressional member information and voting records are pulled directly from the official Congress.gov API and stored locally so the app can quickly look up your representatives and their votes.</li>
+                    <li><strong>AI Analysis</strong> — The full text of each bill is sent to Claude, Anthropic's AI, along with a detailed analysis prompt. Claude reads the bill and returns a structured breakdown of which categories it touches, which direction it moves, and whether any red flags are present.</li>
+                    <li><strong>Temperature set to 0</strong> — Claude gives the most consistent, deterministic answer possible. No creativity, no randomness.</li>
+                    <li><strong>Independent analysis</strong> — Each bill is analyzed against 11 categories and 9 flags independently. Claude doesn't know how other bills were scored.</li>
+                    <li><strong>Large bill handling</strong> — Bills too large to process in one call are split into sections, analyzed separately, and synthesized into a single result.</li>
+                    <li><strong>Long term goal</strong> — Future Feature: A user-friendly database giving citizens direct access to every vote, bill text, and flag — fully searchable.</li>
+                    <li><strong>Human verification</strong> — Future Feature: A rigorous review process where verified human checks confirm AI categorizations, with a checkmark displayed next to verified votes.</li>
+                                </ul>
+            <h2 style="text-align: center;">Take a Look at the Prompts</h2>
+            <p style="text-align: center;">
+                <a href="{{ url_for('prompt_page') }}">See the prompts that power Gadfly</a>
+            </p>
+            <h2 style="text-align: center;">See the Open Source Code Behind the Project</h2>
+            <p style="text-align: center;">
+                <a href="https://github.com/jryanlohmolder/gadfly">View on GitHub</a>
+            </p>                
+        </div>
+    </body>
+</html>

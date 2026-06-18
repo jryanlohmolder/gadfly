@@ -4,13 +4,20 @@
         <title>Gadfly</title>
     </head>
     <body>
-        <h1>Find Your Representatives</h1>
-        {% if error %}
-            <p style="color: red;">{{ error }}</p>
-        {% endif %}
-        <form action="/" method="post">
-            <input type="text" name="zip_code" placeholder="Enter your zip code">
-            <button type="submit">Search</button>>
-        </form>
+        <nav style="text-align: right;">
+            <a href="{{ url_for('home') }}">Home</a> |
+            <a href="{{ url_for('about_page') }}">About</a> |
+            <a href="{{ url_for('prompt_page') }}">Prompts</a>
+        </nav>
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh;">
+            <h1>Find Your Representatives</h1>
+            {% if error %}
+                <p style="color: red;">{{ error }}</p>
+            {% endif %}
+            <form action="/" method="post">
+                <input type="text" name="zip_code" placeholder="Enter your zip code">
+                <button type="submit">Search</button>
+            </form>
+        </div>
     </body>
 </html>
