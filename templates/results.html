@@ -1,16 +1,15 @@
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>Your Represenatives</title>
-    </head>
-    <body>
-        <h1>Your Represenatives</h1>
-        {% for member in members %}
-        <div>
-            <img src="{{ member.image }}" width="100">
-            <h2><a href="{{ url_for('member_profile', member_id=member['member_id']) }}">{{ member.name }}</a></h2>
-            <p>{{ member.party }} - {{ member.chamber }}</p>
-        </div>
-        {% endfor %}
-    </body>
-</html>
+{% extends "base.html" %}
+{% block title %}Your Representatives — Gadfly{% endblock %}
+{% block banner_title %}Gadfly{% endblock %}
+{% block content %}
+<h1 style="font-size: 2.2rem; text-align: center; margin-top: 2.5rem;">Your Representatives</h1>
+<div style="padding-left: 2rem;">
+    {% for member in members %}
+    <div style="margin-bottom: 2rem; margin-top: 5rem">
+        <img src="{{ member.image }}" width="100">
+        <h2><a href="{{ url_for('member_profile', member_id=member['member_id']) }}" style="color: blue; text-decoration: none;">{{ member.name }}</a></h2>
+        <p>{{ member.party }} - {{ member.chamber }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

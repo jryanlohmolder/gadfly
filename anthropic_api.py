@@ -14,7 +14,7 @@ load_dotenv()
 # Constants
 API_KEY = os.getenv("ANTHROPIC_API_KEY")
 MAX_BILL_TOKENS = 180_000
-CHUNK_SIZE = 200_000
+CHUNK_SIZE = 720_000
 
 PARSE_BILL_PROMPT = (
     "You are a nonpartisan bill analysis tool. Analyze the bill text provided "
@@ -30,93 +30,113 @@ PARSE_BILL_PROMPT = (
     '        "corruption_or_reduced_oversight": {\n'
     '            "severity": "red",\n'
     '            "present": true | false,\n'
-    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false",\n'
+    '            "quotes": ["verbatim span(s) copied from the bill supporting this flag; [] if present is false"]\n'
     '        },\n'
     '        "restricts_individual_rights": {\n'
     '            "severity": "red",\n'
     '            "present": true | false,\n'
-    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false",\n'
+    '            "quotes": ["verbatim span(s) copied from the bill supporting this flag; [] if present is false"]\n'
     '        },\n'
     '        "subordinates_us_interests": {\n'
     '            "severity": "caution",\n'
     '            "present": true | false,\n'
-    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false",\n'
+    '            "quotes": ["verbatim span(s) copied from the bill supporting this flag; [] if present is false"]\n'
     '        },\n'
     '        "misleading_title": {\n'
     '            "severity": "caution",\n'
     '            "present": true | false,\n'
-    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false",\n'
+    '            "quotes": ["verbatim span(s) copied from the bill supporting this flag; [] if present is false"]\n'
     '        },\n'
     '        "obfuscation_by_verbosity": {\n'
     '            "severity": "caution",\n'
     '            "present": true | false,\n'
-    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false",\n'
+    '            "quotes": ["verbatim span(s) copied from the bill supporting this flag; [] if present is false"]\n'
     '        },\n'
     '        "riders": {\n'
     '            "severity": "caution",\n'
     '            "present": true | false,\n'
-    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false",\n'
+    '            "quotes": ["verbatim span(s) copied from the bill supporting this flag; [] if present is false"]\n'
     '        },\n'
     '        "cross_referencing_obfuscation": {\n'
     '            "severity": "caution",\n'
     '            "present": true | false,\n'
-    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false",\n'
+    '            "quotes": ["verbatim span(s) copied from the bill supporting this flag; [] if present is false"]\n'
     '        },\n'
     '        "internal_contradiction": {\n'
     '            "severity": "informational",\n'
     '            "present": true | false,\n'
-    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false",\n'
+    '            "quotes": ["verbatim span(s) copied from the bill supporting this flag; [] if present is false"]\n'
     '        },\n'
     '        "sunset_clauses": {\n'
     '            "severity": "informational",\n'
     '            "present": true | false,\n'
-    '            "explanation": "1-2 sentence explanation or null if present is false"\n'
+    '            "explanation": "1-2 sentence explanation or null if present is false",\n'
+    '            "quotes": ["verbatim span(s) copied from the bill supporting this flag; [] if present is false"]\n'
     '        }\n'
     '    },\n'
     '    "categories": {\n'
     '        "Economy & Cost of Living": {\n'
     '            "direction": "Expand spending / stimulus" | "Cut spending / austerity" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        },\n'
     '        "Immigration & Border Security": {\n'
     '            "direction": "Expand pathways / access" | "Restrict entry / tighten borders" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        },\n'
     '        "Democracy & Governance": {\n'
     '            "direction": "Strengthen voting / institutions" | "Restrict voting / reduce oversight" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        },\n'
     '        "Housing & Affordability": {\n'
     '            "direction": "Expand housing access / funding" | "Cut housing programs / deregulate" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        },\n'
     '        "Healthcare": {\n'
     '            "direction": "Expand access / coverage" | "Reduce / restrict access" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        },\n'
     '        "Individual Rights & Civil Liberties": {\n'
     '            "direction": "Strengthen rights / protections" | "Restrict rights / increase restrictions" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        },\n'
     '        "Crime & Public Safety": {\n'
     '            "direction": "Expand rehabilitation / prevention" | "Increase enforcement / penalties" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        },\n'
     '        "Corruption & Government Accountability": {\n'
     '            "direction": "Increase transparency / oversight" | "Reduce oversight / accountability" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        },\n'
     '        "Social Programs & Safety Net": {\n'
     '            "direction": "Expand programs / benefits" | "Cut / reduce programs" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        },\n'
     '        "Environment & Energy": {\n'
     '            "direction": "Expand protections / clean energy" | "Reduce protections / expand fossil fuels" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        },\n'
     '        "Foreign Policy, War & National Security": {\n'
     '            "direction": "Coercive / military might" | "Diplomatic / de-escalatory" | "Not present" | "Internal contradiction",\n'
-    '            "flagged": true | false\n'
+    '            "flagged": true | false,\n'
+    '            "quotes": ["verbatim span(s) copied from the bill placing it in this category/direction; [] if Not present"]\n'
     '        }\n'
     '    },\n'
     '    "summary": "Plain language summary of what the bill actually does. Write as long as the bill requires — a simple bill may need one sentence, a complex bill may need a paragraph. Describe only what the bill mechanically changes: what it adds, removes, restricts, allocates, or requires. Do not characterize intent or likely impact."\n'
@@ -147,6 +167,11 @@ PARSE_BILL_PROMPT = (
     "- cross_referencing_obfuscation: flag if the bill relies heavily on references to other legislation without plain language explanation.\n"
     "- internal_contradiction: flag if the bill pulls in both directions within any single category.\n"
     "- sunset_clauses: flag if provisions expire after a defined period without clear plain language notice.\n\n"
+    "Quote rules:\n"
+    "- Every quote must be copied EXACTLY from the bill text — a character-for-character substring. "
+    "Do not paraphrase, summarize, fix typos, add ellipses, or change whitespace or punctuation.\n"
+    "- Use the shortest span that justifies the determination (a clause or sentence, not a whole section).\n"
+    "- List each span as its own string; use an empty list [] when a flag is not present or a category is 'Not present'.\n\n"
     "BILL TEXT:\n"
 )
 
@@ -184,7 +209,7 @@ def parse_bill_text(text):
         Anthropic.APIError: If a non-429 API error is returned.
     """
      
-    client = Anthropic(default_headers={"anthropic-beta": "prompt-caching-2024-07-31"}, max_retries=5, timeout=300.0)
+    client = Anthropic(default_headers={"anthropic-beta": "prompt-caching-2024-07-31"}, max_retries=0, timeout=300.0)
     
     # Count tokens
     token_response = client.messages.count_tokens(
@@ -224,7 +249,9 @@ def parse_bill_text(text):
                 continue
 
             except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
-                print(f"API error: {e}", flush=True)
+                print(f"API error type: {type(e).__name__}", flush=True)
+                print(f"API error message: {e}", flush=True)
+                print(f"API error cause: {e.__cause__}", flush=True)
                 time.sleep(5)
                 count += 1
                 if count == run_cap:
@@ -280,7 +307,9 @@ def parse_bill_text(text):
                     continue
 
                 except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
-                    print(f"API error: {e}", flush=True)
+                    print(f"API error type: {type(e).__name__}", flush=True)
+                    print(f"API error message: {e}", flush=True)
+                    print(f"API error cause: {e.__cause__}", flush=True)
                     time.sleep(5)
                     count += 1
                     if count == run_cap:
@@ -306,7 +335,16 @@ def parse_bill_text(text):
             raise ValueError("All chunks failed JSON parsing")
 
         combined_result = merge_chunks(chunk_results)
-        
+
+        # Quotes were unioned deterministically in merge_chunks. Strip them from
+        # the synthesis payload so Claude doesn't spend output tokens echoing
+        # (and risk altering) verbatim spans — they're reattached after parsing.
+        slim_result = copy.deepcopy(combined_result)
+        for flag in slim_result["flags"].values():
+            flag.pop("quotes", None)
+        for cat in slim_result["categories"].values():
+            cat.pop("quotes", None)
+
         # Initialize count
         count = 0
         run_cap = 5
@@ -317,7 +355,7 @@ def parse_bill_text(text):
                     model="claude-sonnet-4-6",
                     max_tokens=8_000,
                     temperature=0,
-                    messages=[{"role": "user", "content": SYNTHESIZE_CHUNKS_PROMPT + json.dumps(combined_result)}]
+                    messages=[{"role": "user", "content": SYNTHESIZE_CHUNKS_PROMPT + json.dumps(slim_result)}]
                 )
                 break
             
@@ -333,7 +371,9 @@ def parse_bill_text(text):
                 continue
 
             except (anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
-                print(f"API error: {e}", flush=True)
+                print(f"API error type: {type(e).__name__}", flush=True)
+                print(f"API error message: {e}", flush=True)
+                print(f"API error cause: {e.__cause__}", flush=True)
                 time.sleep(5)
                 count += 1
                 if count == run_cap:
@@ -351,6 +391,14 @@ def parse_bill_text(text):
         except json.JSONDecodeError as e:
             print(f"JSON parsing error: {e}")
             raise
+
+        # Reattach the deterministic quote unions onto whatever flags/categories
+        # synthesis kept. Never trust the model to reproduce verbatim spans; any
+        # holistic flag synthesis newly activates simply carries an empty list.
+        for name, data in result["flags"].items():
+            data["quotes"] = combined_result["flags"].get(name, {}).get("quotes", [])
+        for name, data in result["categories"].items():
+            data["quotes"] = combined_result["categories"].get(name, {}).get("quotes", [])
 
         # Number of chunks the bill was split into (captures bill length,
         # even if some chunks failed JSON parsing)
@@ -385,12 +433,24 @@ def merge_chunks(chunk_results):
     for flag_name in merged["flags"].keys():
         if any(chunk["flags"][flag_name]["present"] for chunk in chunk_results):
             merged["flags"][flag_name]["present"] = True
+
+        # Union supporting quotes from every chunk (no chunk sees the whole bill)
+        merged_quotes = []
+        for chunk in chunk_results:
+            merged_quotes.extend(chunk["flags"][flag_name].get("quotes", []))
+        merged["flags"][flag_name]["quotes"] = merged_quotes
     
     # Create merged categories
     for category in merged["categories"].keys():
         directions = [chunk["categories"][category]["direction"] 
               for chunk in chunk_results 
               if chunk["categories"][category]["direction"] != "Not present"]
+
+        # Union supporting quotes from every chunk
+        merged_quotes = []
+        for chunk in chunk_results:
+            merged_quotes.extend(chunk["categories"][category].get("quotes", []))
+        merged["categories"][category]["quotes"] = merged_quotes
         
         # Create unique directions
         unique_directions = set(directions)

@@ -113,7 +113,7 @@ def store_member_vote(member_id, vote_id, position, engine=None):
         session.add(new_member_vote)
         session.commit()
 
-def store_category(vote_id, category, direction, flagged, engine=None):
+def store_category(vote_id, category, direction, flagged, quotes=None, engine=None):
     """
     Inserts a category for a vote and records it in the vote_categories table.
 
@@ -122,6 +122,7 @@ def store_category(vote_id, category, direction, flagged, engine=None):
         category (str): One of the pre-defined 11 categories captured in a particular piece of legislation
         direction (Boolean): Which direction the legislation in regards to the category
         flagged (Boolean): If true category has been flagged for internal contradiction
+        quotes (list[str]): Verbatim bill spans supporting this category. May be None.
 
     Returns:
         None
@@ -133,11 +134,11 @@ def store_category(vote_id, category, direction, flagged, engine=None):
     if engine is None:
         engine = get_engine()
     with Session(engine) as session:
-        new_category = Category(vote_id=vote_id, category=category, direction=direction, flagged=flagged)
+        new_category = Category(vote_id=vote_id, category=category, direction=direction, flagged=flagged, quotes=quotes)
         session.add(new_category)
         session.commit()
 
-def store_vote_flag(vote_id, flag_name, severity, explanation, engine=None):
+def store_vote_flag(vote_id, flag_name, severity, explanation, quotes=None, engine=None):
     """
     Inserts a category for a vote and records it in the vote_flags table.
 
@@ -146,6 +147,7 @@ def store_vote_flag(vote_id, flag_name, severity, explanation, engine=None):
         flag_name (text): Type of flag that was captured for a particular piece of legislation
         severity (text): How serious is the flag (red, caution, informatory)
         explanation (text): 1-2 setences explaining why the legislation was flagged
+        quotes (list[str]): Verbatim bill spans supporting this flag. May be None.
 
     Returns:
         None
@@ -157,7 +159,7 @@ def store_vote_flag(vote_id, flag_name, severity, explanation, engine=None):
     if engine is None:
         engine = get_engine()
     with Session(engine) as session:
-        new_vote_flag = VoteFlag(vote_id=vote_id, flag_name=flag_name, severity=severity, explanation=explanation)
+        new_vote_flag = VoteFlag(vote_id=vote_id, flag_name=flag_name, severity=severity, explanation=explanation, quotes=quotes)
         session.add(new_vote_flag)
         session.commit()
 
@@ -409,17 +411,17 @@ def lookup_representative(zip_code, engine=None):
         engine = get_engine()
 
     if not re.match(r'^\d{5}$', zip_code):
-        return {"error": "Please enter a valid 5-digit zip code"}
+        return [{"error": "Please enter a valid 5-digit zip code"}]
     
     with Session(engine) as session:
 
         zip_district = session.query(ZipDistrict).filter(ZipDistrict.zcta == zip_code).first()
         if zip_district is None:
-            return {"error": "Please enter a valid zip code"}
+            return [{"error": "Please enter a valid zip code"}]
         
         state_name = FIPS_TO_STATE.get(zip_district.state)
         if state_name is None:
-            return {"error": "Please enter a valid zip code"}
+            return [{"error": "Please enter a valid zip code"}]
         
         # Get house represenatative
         house_representative = (

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Date, Text, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Date, Text, Boolean, ForeignKey, UniqueConstraint, JSON
 from sqlalchemy.orm import DeclarativeBase
 
 class Base(DeclarativeBase):
@@ -91,6 +91,7 @@ class Category(Base):
         category: single category for that particular vote
         direction: which way the bill goes (False=left, True=right)
         flagged: if the category is problematic
+        quotes: list[str] of verbatim bill spans supporting this category/direction
     """
 
     __tablename__ = "vote_categories"
@@ -99,6 +100,7 @@ class Category(Base):
     category = Column(Text)
     direction = Column(String)
     flagged = Column(Boolean)
+    quotes = Column(JSON)
 
 class VoteFlag(Base):
     """
@@ -109,6 +111,7 @@ class VoteFlag(Base):
         flag_name: describes what is being flagged
         severity: red / caution / informational
         explanation: 1-2 sentences saying why it was flagged
+        quotes: list[str] of verbatim bill spans supporting this flag
     """
 
     __tablename__ = "vote_flags"
@@ -117,6 +120,7 @@ class VoteFlag(Base):
     flag_name = Column(Text)
     severity = Column(Text)
     explanation = Column(Text)
+    quotes = Column(JSON)
 
 class SponsoredLegislation(Base):
     """

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}Gadfly{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <header class="banner">
+        <img src="{{ url_for('static', filename='img/socrates_banner.png') }}" style="height: 88px; position: absolute; left: 16px; bottom: 0;">
+        <nav class="banner-nav">
+            <a href="{{ url_for('home') }}">Home</a>
+            <a href="{{ url_for('about_page') }}">About</a>
+            <a href="{{ url_for('prompt_page') }}">Prompts</a>
+        </nav>
+        <div class="banner-title {% block banner_title_class %}{% endblock %}">{% block banner_title %}{% endblock %}</div>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

@@ -161,13 +161,13 @@ def categorize_votes(engine, limit=None):
         
         # Store Summary
         database.store_vote_summary(vote["vote_id"], result["summary"], result["chunk_count"], engine)
-        # Store categories
+        # Store categories (with supporting quote spans)
         for name, data in result["categories"].items():
-            database.store_category(vote["vote_id"], name, data["direction"], data["flagged"], engine)
+            database.store_category(vote["vote_id"], name, data["direction"], data["flagged"], data.get("quotes"), engine)
 
-        # Store flags
+        # Store flags (with supporting quote spans)
         for name, data in result["flags"].items():
-            database.store_vote_flag(vote["vote_id"], name, data["severity"], data["explanation"], engine)
+            database.store_vote_flag(vote["vote_id"], name, data["severity"], data["explanation"], data.get("quotes"), engine)
 
     # Print progress
     print(f"votes categorized: {len(votes)}")

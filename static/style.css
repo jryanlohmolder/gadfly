@@ -1,0 +1,337 @@
+/* ============================================================
+   GADFLY — style.css
+   How to read this file:
+   - Variables at the top = change one thing, updates everywhere
+   - Sections are labeled with === headers ===
+   - Comments explain WHY, not just what
+   ============================================================ */
+
+
+/* ── VARIABLES ──────────────────────────────────────────────
+   :root means "the whole document."
+   --variable-name: value; defines a custom property.
+   Use it anywhere with: var(--variable-name)
+   ──────────────────────────────────────────────────────────── */
+:root {
+    --red:       #7A1515;    /* dark crimson banner — adjust to taste */
+    --cream:     #EDE0C4;    /* marble cream — match this to the Socrates bust image */
+    --cream-dim: #C8B89A;    /* slightly darker cream for hover states */
+    --bg:        #F7F4EF;    /* off-white page background */
+    --text:      #1A1A1A;    /* near-black body text */
+    --border:    #D9D0C0;    /* subtle divider color */
+    --banner-h:  100px;       /* banner height — change once, applies everywhere */
+}
+
+
+/* ── RESET ───────────────────────────────────────────────────
+   Browsers add their own margins/padding by default.
+   We zero everything out so we're in control from the start.
+   box-sizing: border-box means padding is included in width,
+   which makes layout math much easier.
+   ──────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Georgia, serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+
+/* ── BANNER ──────────────────────────────────────────────────
+   position: relative on the banner lets us position children
+   (like the centered title) relative to the banner itself,
+   not the whole page.
+   ──────────────────────────────────────────────────────────── */
+.banner {
+    background: var(--red);
+    height: var(--banner-h);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;   /* centers the title naturally */
+    padding: 0 32px;
+}
+
+/* Navigation links — pinned to the right edge */
+.banner-nav {
+    position: absolute;
+    right: 32px;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+}
+
+.banner-nav a {
+    color: var(--cream);
+    text-decoration: none;
+    font-family: Georgia, serif;
+    font-size: 15px;
+    letter-spacing: 0.04em;
+    transition: color 0.15s ease;
+}
+
+.banner-nav a:hover {
+    color: var(--cream-dim);
+}
+
+/* Banner title — centered by the parent flexbox */
+.banner-title {
+    color: var(--cream);
+    font-family: Georgia, serif;
+    font-size: 35px;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Home page: bigger and bolder */
+.banner-title.home {
+    font-size: 40px;
+    letter-spacing: 0.14em;
+}
+
+
+/* ── PAGE DIVIDERS ───────────────────────────────────────────
+   A simple <hr class="divider"> between sections.
+   Using a class instead of styling hr directly means you
+   can still use plain <hr> elsewhere without this style.
+   ──────────────────────────────────────────────────────────── */
+.divider {
+    border: none;
+    border-top: 1.5px solid var(--border);
+    margin: 36px 0;
+}
+
+
+/* ── HOME PAGE ───────────────────────────────────────────────
+   The hero section: centered zip search.
+   height: calc(100vh - var(--banner-h)) fills the viewport
+   below the banner exactly.
+   ──────────────────────────────────────────────────────────── */
+.home-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: calc(100vh - var(--banner-h));
+    gap: 20px;
+}
+
+.home-hero h3 {
+    font-size: 20px;
+    font-weight: normal;
+    color: #555;
+    letter-spacing: 0.02em;
+}
+
+.home-hero input[type="text"] {
+    padding: 10px 16px;
+    font-size: 16px;
+    font-family: Georgia, serif;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: #fff;
+    width: 260px;
+    outline: none;
+}
+
+.home-hero input[type="text"]:focus {
+    border-color: var(--red);
+}
+
+.home-hero button {
+    padding: 10px 28px;
+    font-size: 15px;
+    font-family: Georgia, serif;
+    background: var(--red);
+    color: var(--cream);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: background 0.15s ease;
+}
+
+.home-hero button:hover {
+    background: #5E1010;
+}
+
+.home-hero .error {
+    color: #c0392b;
+    font-size: 14px;
+}
+
+
+/* ── RESULTS PAGE ────────────────────────────────────────────
+   The three representative cards (House + 2 Senators).
+   gap between cards, and a clear divider below this
+   section before the voter profile area.
+   ──────────────────────────────────────────────────────────── */
+.results-container {
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 24px;
+}
+
+.results-grid {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 40px;
+}
+
+.rep-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px 20px;
+    text-align: center;
+    width: 260px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.rep-card img {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    margin-bottom: 12px;
+}
+
+.rep-card h2 {
+    font-size: 17px;
+    margin-bottom: 4px;
+}
+
+.rep-card .party-chamber {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 12px;
+}
+
+.rep-card a {
+    color: var(--red);
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.rep-card a:hover {
+    text-decoration: underline;
+}
+
+
+/* ── MEMBER PAGE ─────────────────────────────────────────────
+   Member header (photo + name + info) sits above the tabs.
+   Clear visual separation between header and tab content.
+   ──────────────────────────────────────────────────────────── */
+.member-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+.member-header {
+    text-align: center;
+    padding: 40px 20px 28px;
+    border-bottom: 1.5px solid var(--border);   /* This is the clear divide */
+}
+
+.member-header img {
+    width: 160px;
+    height: 160px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    margin-bottom: 16px;
+}
+
+.member-header h1 {
+    font-size: 26px;
+    margin-bottom: 6px;
+}
+
+.member-header .meta {
+    font-size: 14px;
+    color: #666;
+}
+
+/* Left-side tab layout */
+.member-body {
+    display: flex;
+    gap: 0;
+    min-height: 500px;
+    border-bottom: 1.5px solid var(--border);
+}
+
+.tab-sidebar {
+    width: 180px;
+    flex-shrink: 0;
+    border-right: 1.5px solid var(--border);
+    padding: 24px 0;
+}
+
+.tab-btn {
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    border-right: 3px solid transparent;
+    text-align: left;
+    font-family: Georgia, serif;
+    font-size: 14px;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tab-btn:hover {
+    background: #f0ebe2;
+    color: var(--text);
+}
+
+/* .active is added by JS when a tab is selected */
+.tab-btn.active {
+    background: #f0ebe2;
+    color: var(--red);
+    border-right-color: var(--red);
+    font-weight: bold;
+}
+
+.tab-content {
+    flex: 1;
+    padding: 28px 32px;
+}
+
+/* All panels hidden by default; JS adds .active to show one */
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+.tab-btn {
+    padding: 8px 20px;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    background: #f0f0f0;
+    cursor: pointer;
+    font-family: Georgia, serif;
+    font-size: 1rem;
+    border-radius: 6px 6px 0 0;
+}
+.tab-btn.active-tab {
+    background: white;
+    border-bottom: 1px solid white;
+    margin-bottom: -1px;
+}

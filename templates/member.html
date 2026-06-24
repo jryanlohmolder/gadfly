@@ -1,34 +1,68 @@
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>{{ member.name }}</title>
-    </head>
-    <body>
-        <h1>{{ member.name }}</h1>
-        <p>{{ member.party }} - {{ member.state }}</p>
-        <img src="{{ member.picture_url }}">
-        <p>{{ member.photo_cred }}</p>
+{% extends "base.html" %}
+{% block title %}{{ member.name }}{% endblock %}
+{% block banner_title %}Gadfly{% endblock %}
+{% block content %}
 
-        <h2>Voting Profile</h2>
+<div style="max-width: 900px; margin: 0 auto; padding: 40px 20px; text-align: center;">
+
+    <h1>{{ member.name }}</h1>
+    <p>{{ member.party }} - {{ member.state }}</p>
+    <img src="{{ member.picture_url }}" style="width: 250px;">
+    <p style="margin-bottom: 2rem;">{{ member.photo_cred }}</p>
+
+    <div style="display: flex; padding-left: 2rem; margin-top: 2rem;">
+        <button onclick="showTab('voting')" class="tab-btn active-tab" id="btn-voting">Voting Profile</button>
+        <button onclick="showTab('good')" class="tab-btn" id="btn-good">Good Legislation</button>
+        <button onclick="showTab('bad')" class="tab-btn" id="btn-bad">Bad Legislation</button>
+    </div>
+
+    <div id="voting" class="tab-panel" style="display: block;">
         {% for category, data in scores.items() %}
-        <div>
+        <div style="margin-bottom: 1.5rem; text-align: center;">
             <h3>{{ category }}</h3>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span>{{ data.left_label }}</span>
-                <div style="width: 300px; background: #ddd; height: 20px; position: relative;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span style="width: 180px; text-align: right;">{{ data.left_label }}</span>
+                <div style="width: 300px; background: #ddd; height: 20px; position: relative; border-radius: 999px;">
                     {% set total = data.left_count + data.right_count %}
                     {% if total > 0 %}
-                        {% set pct = (data.left_count / total * 100) | int %}
+                        {% set pct = ((data.left_count - data.right_count) / total * 50) | int %}
                     {% else %}
-                        {% set pct = 50 %}
+                        {% set pct = 0 %}
                     {% endif %}
-                    <p>pct: {{ pct }}, total: {{ total }}</p>
-                    <div style="width: {{ pct }}%; background: blue; height: 100%;"></div>
+                    {% if pct > 0 %}
+                        <div style="position: absolute; left: 50%; top: 0; width: {{ pct }}%; height: 100%; background: #87CEEB; border-radius: 0 999px 999px 0;"></div>
+                    {% elif pct < 0 %}
+                        <div style="position: absolute; right: 50%; top: 0; width: {{ pct | abs }}%; height: 100%; background: #87CEEB; border-radius: 999px 0 0 999px;"></div>
+                    {% endif %}
+                    <div style="position: absolute; left: 50%; top: 0; width: 2px; height: 100%; background: black;"></div>
                 </div>
-                <span>{{ data.right_label }}</span>
+                <span style="width: 180px; text-align: left;">{{ data.right_label }}</span>
             </div>
-            <p>{{ data.right_label }}</p>
         </div>
         {% endfor %}
-    </body>
-</html>
+    </div>
+
+    <div id="good" class="tab-panel" style="display: none;">
+        <p>Coming soon</p>
+    </div>
+
+    <div id="bad" class="tab-panel" style="display: none;">
+        <p>Coming soon</p>
+    </div>
+
+</div>
+
+<script>
+    function showTab(tabName) {
+        document.querySelectorAll('.tab-panel').forEach(function(panel) {
+            panel.style.display = 'none';
+        });
+        document.querySelectorAll('.tab-btn').forEach(function(btn) {
+            btn.classList.remove('active-tab');
+        });
+        document.getElementById(tabName).style.display = 'block';
+        document.getElementById('btn-' + tabName).classList.add('active-tab');
+    }
+</script>
+
+{% endblock %}
