@@ -227,7 +227,7 @@ def parse_bill_text(text):
         while count < run_cap:
             try:
                 # Make API call
-                response = client.messages.create(
+                with client.messages.stream(
                     model="claude-sonnet-4-6",
                     max_tokens=8_000,
                     temperature=0,
@@ -235,7 +235,8 @@ def parse_bill_text(text):
                         {"type": "text", "text": PARSE_BILL_PROMPT, "cache_control": {"type": "ephemeral"}},
                         {"type": "text", "text": text}
                     ]}]
-                )
+                ) as stream:
+                    response = stream.get_final_message()
                 break
             
             except anthropic.RateLimitError:
@@ -285,7 +286,7 @@ def parse_bill_text(text):
             while count < run_cap:
                 try:
                     # Make API call
-                    response = client.messages.create(
+                    with client.messages.stream(
                         model="claude-sonnet-4-6",
                         max_tokens=8_000,
                         temperature=0,
@@ -293,7 +294,8 @@ def parse_bill_text(text):
                             {"type": "text", "text": PARSE_BILL_PROMPT, "cache_control": {"type": "ephemeral"}},
                             {"type": "text", "text": chunk}
                         ]}]
-                    )
+                    ) as stream:
+                        response = stream.get_final_message()
                     break
                 
                 except anthropic.RateLimitError:
@@ -351,12 +353,13 @@ def parse_bill_text(text):
         while count < run_cap:
             try:
                 # Resend combined results to Claude
-                response = client.messages.create(
+                with client.messages.stream(
                     model="claude-sonnet-4-6",
                     max_tokens=8_000,
                     temperature=0,
                     messages=[{"role": "user", "content": SYNTHESIZE_CHUNKS_PROMPT + json.dumps(slim_result)}]
-                )
+                ) as stream:
+                    response = stream.get_final_message()
                 break
             
             except anthropic.RateLimitError:

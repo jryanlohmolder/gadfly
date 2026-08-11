@@ -49,7 +49,6 @@ def member_profile(member_id):
         member = session.get(Member, member_id)
 
         member_category_scores = get_member_category_scores(member_id)
-        print(member_category_scores)
 
     return render_template("member.html", member=member, scores=member_category_scores)
 
