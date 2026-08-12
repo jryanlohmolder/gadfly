@@ -1,3 +1,4 @@
+import os
 import re
 
 from sqlalchemy import create_engine
@@ -59,7 +60,8 @@ def get_engine():
     Raises:
         sqlalchemy.exc.SQLAlchemyError: If the engine cannot be created.
     """
-    engine = create_engine("sqlite:///congress_voting_data.db")
+    db_url = os.environ.get("DATABASE_URL", "sqlite:///congress_voting_data.db")
+    engine = create_engine(db_url)
     Base.metadata.create_all(engine)
     return engine
 

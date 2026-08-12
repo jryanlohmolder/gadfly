@@ -1,11 +1,19 @@
+import os
+
 from flask import Flask, render_template, request, redirect, url_for
 from sqlalchemy.orm import Session
 
 from anthropic_api import PARSE_BILL_PROMPT, SYNTHESIZE_CHUNKS_PROMPT
-from database import get_engine, lookup_representative, get_member_category_scores
+from database import get_engine, lookup_representative, get_member_category_scores, load_zip_districts
 from models import Member
 
 app = Flask(__name__)
+
+# Load zip code lookup into database at startup
+engine = get_engine()
+crosswalk_path = os.path.join(os.path.dirname(__file__), "tab20_cd11920_zcta520_natl.txt")
+if os.path.exists(crosswalk_path):
+    load_zip_districts(crosswalk_path, engine)
 
 @app.route("/", methods=["GET", "POST"])
 def home():
