@@ -8,12 +8,9 @@
     <h1>{{ member.name }}</h1>
     <p>{{ member.party }} - {{ member.state }}</p>
     <img src="{{ member.picture_url }}" style="width: 250px;">
-    <p style="margin-bottom: 2rem;">{{ member.photo_cred }}</p>
 
     <div style="display: flex; padding-left: 2rem; margin-top: 2rem;">
         <button onclick="showTab('voting')" class="tab-btn active-tab" id="btn-voting">Voting Profile</button>
-        <button onclick="showTab('good')" class="tab-btn" id="btn-good">Good Legislation</button>
-        <button onclick="showTab('bad')" class="tab-btn" id="btn-bad">Bad Legislation</button>
     </div>
 
     <div id="voting" class="tab-panel" style="display: block;">
@@ -41,15 +38,6 @@
         </div>
         {% endfor %}
     </div>
-
-    <div id="good" class="tab-panel" style="display: none;">
-        <p>Coming soon</p>
-    </div>
-
-    <div id="bad" class="tab-panel" style="display: none;">
-        <p>Coming soon</p>
-    </div>
-
 </div>
 
 <script>

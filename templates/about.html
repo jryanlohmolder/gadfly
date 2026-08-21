@@ -6,19 +6,28 @@
 <div style="padding: 40px; max-width: 900px; margin: 0 auto;">
     
     <h3>What is Gadfly?</h3>
-    Gadfly is an open source civic transparency tool built to show everdday Americans if
-    their congressional representatives actually represent them<br><br>
+    Gadfly is an open source civic transparency tool built to hold the United States' Congress accountable. Meaning, it exists to clearly show Americans, 
+    irrespective of party affiliation, socioeconomic status, or class if their representatives actually represent them.
+    <br><br>
     <h3>How it works</h3>
-    Enter your zip code and Gadfly finds your House representative and two senators. For each
-    representative, we analyze their voting records across 11 policy categories selected for their
-    impact on the daily lives of most Americans. This like healthcare, housing, individual rights,
-    and government accountability. Each bill for the 119th Congress is analyzed using
-    AI to determine which categoreis it touches and which directions it moves<br><br>
-    <h3>Carrots & Sticks</h3>
-    We highlight both the good and the bad. The legislation pages show where a representative
-    sponsored, cosponsored, or voted for bills that raised red flags, and where they stood up
-    for transparency, individual rights, and their constituents' interests. The goal is simple: give
-    represenatives an incentive to actually who elected them.<br><br>
+    Enter your zip code and Gadfly finds your House representative and two senators. For each representative, Gadfly analyzes their voting 
+    records across 11 policy areas, each split into a directional binary (e.g. Category: Economy & Cost of Living, Directional Binary: Expanding Spending 
+    / Stimulus vs Cutting Spending / Austerity) and converts it into one easily digestible voter profile. Policy areas like healthcare, housing, 
+    individual rights, and government accountability were selected for their impact on the daily lives of the majority of Americans. A sample of legislation 
+    voted on in the 119th Congress was analyzed using Claude's Sonnet 4.6 to determine which categories it touches and which directions it moves. The votes 
+    of each member of the chamber that voted on the legislation had the relevant categories and directions applied to their voter profile.
+    <br><br>
+    <h3>Where Gadfly Is & Where Gadfly Is Going</h3>
+    Gadfly is currently in the proof of concept phase. The concept that it proves: congressional voting data can be compiled and organized in 
+    a way that makes it easy for everyday citizens to determine for themselves if their representatives are voting in their interest. That being said, the 
+    categorization carried out by Claude has not been verified for every house vote, and some categorizations that have been reviewed were found to be 
+    dubious. Voter profiles in their current form are to show the overall concept. Current categorization of voter records should be viewed with healthy 
+    skepticism.<br>
+    
+    The data pipeline for senate voting data is currently being built. Once that is built and a sample of senate votes have been categorized the next step 
+    will be to improve the categorization process. I believe that the growing concern over large language models, and more specifically the companies 
+    building them, is not unfounded. Because of this, it is my intention to build Gadfly's own neural network that will initially categorize legislation and be 
+    followed by a human run verification process.<br><br>
     <h3>Open Source</h3>
     Gadfly is an open source project. Contributions, data sharing, and feature suggestions are
     welcome.
@@ -26,14 +35,13 @@
     <h2 style="text-align: center; margin-top: 3rem; margin-bottom: 1.5rem">Method Behind the Madness</h2>
         <ul>
             <li><strong>House Voting Data Obtained from Congress Api - <a href="https://api.congress.gov/" style="color: blue; text-decoration: none;">Congress API</a></strong></li>
-            <li><strong>Senate Voting Data Obtained from </strong> - This feature is coming in the future</li>
-            <li><strong>Member & Vote Data</strong> — All congressional member information and voting records are pulled directly from the official Congress.gov API and stored locally so the app can quickly look up your representatives and their votes.</li>
-            <li><strong>AI Analysis</strong> — The full text of each bill is sent to Claude, Anthropic's AI, along with a detailed analysis prompt. Claude reads the bill and returns a structured breakdown of which categories it touches, which direction it moves, and whether any red flags are present.</li>
-            <li><strong>Temperature set to 0</strong> — Claude gives the most consistent, deterministic answer possible. No creativity, no randomness.</li>
-            <li><strong>Independent analysis</strong> — Each bill is analyzed against 11 categories and 9 flags independently. Claude doesn't know how other bills were scored.</li>
-            <li><strong>Large bill handling</strong> — Bills too large to process in one call are split into sections, analyzed separately, and synthesized into a single result.</li>
-            <li><strong>Long term goal</strong> — Future Feature: A user-friendly database giving citizens direct access to every vote, bill text, and flag — fully searchable.</li>
-            <li><strong>Human verification</strong> — Future Feature: A rigorous review process where verified human checks confirm AI categorizations, with a checkmark displayed next to verified votes.</li>
+            <li><strong>Member & Vote Data</strong> - All congressional member information and voting records are pulled directly from the official Congress.gov API and stored locally so the app can quickly look up your representatives and their votes.</li>
+            <li><strong>AI Analysis</strong> - The full text of each bill is sent to Claude, Anthropic's AI, along with a detailed analysis prompt. Claude reads the bill and returns a structured breakdown of which categories it touches, which direction it moves, and whether any red flags are present.</li>
+            <li><strong>Temperature set to 0</strong> - Claude gives the most consistent, deterministic answer possible. No creativity, no randomness.</li>
+            <li><strong>Independent analysis</strong> - Each bill is analyzed against 11 categories and 9 flags independently.</li>
+            <li><strong>Large bill handling</strong> - Bills too large to process in one call are split into sections, analyzed separately, and synthesized into a single result.</li>
+            <li><strong>Long term goal</strong> - Future Feature: A user-friendly database giving citizens direct access to every vote, bill text, and flag, fully searchable.</li>
+            <li><strong>Human verification</strong> - Future Feature: A rigorous review process where verified human checks confirm AI categorizations, with clear indication to human verified votes.</li>
                         </ul>
     <h2 style="text-align: center; margin-top: 3rem; margin-bottom: 1rem;">Take a Look at the Prompts</h2>
     <p style="text-align: center;">
