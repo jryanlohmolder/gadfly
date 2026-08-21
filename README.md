@@ -1,21 +1,14 @@
 # Gadfly
 
-**Gadfly** is a civic transparency tool that ingests congressional voting data from the Congress API and presents it as accessible, searchable profiles for every sitting member of Congress.
+**Gadfly** is an open source civic transparency tool built to hold the United States' Congress accountable. Meaning, it exists to clearly show Americans, irrespective of party affiliation, socioeconomic status, or class if their representatives actually represent them. Gadfly ingests congressional voting data from the Congress API and presents it as accessible, searchable profiles for every sitting member of Congress.
 
-> **Status:** Data pipeline complete (members, votes, bill text, member positions, and AI categorization). Web interface is in progress — sections marked _Planned_ below are not yet built.
+> **Status:** Data pipeline for the House is complete (members, votes, bill text, member positions, and AI categorization). The Senate data pipeline is currently being built. After that effort will be shifted to developing the neural network that will categorize legislation and power Gadfly.
 
 ---
 
 ## What It Does
 
-The goal: enter your zip code to pull up your two U.S. Senators and your House Representative, then click any of them to see how they actually vote — in plain language.
-
-For each member the data layer currently supports:
-
-- **Voting profile** — a full log of their votes, each with a plain-language summary of the bill, the policy categories it touches, the directional lean within each category, and any flags raised during analysis.
-- **Legislation** — the bills they sponsored or cosponsored, with policy area.
-
-A derived "accountability" view (bills that reduced government oversight, expanded military spending, or restricted individual rights) is _Planned_ — it will be built on top of the flags and category directions already stored per vote.
+Enter your zip code to pull up your two U.S. Senators and your House Representative, then click any of them to see how they actually vote in an easy to digest, voter profile.
 
 ---
 
@@ -146,15 +139,16 @@ The summary is stored in the `summary` field of the `Votes` table. All applicabl
 
 ---
 
-## Web Interface _(Planned)_
+## Web Interface
 
-Built with **Flask**. Planned navigation:
+Built with **Flask**:
 
-- **Home** — zip-code member selection (look up your senators + house rep)
-- **Member Profile** — per-member voting record and legislation
-- **About** — searchable list of bills surfaced by the accountability flags (reduced oversight, expanded military spending, restricted individual rights), with sponsors and summaries
+- **Home** - zip-code member selection (look up your senators + house rep)
+- **Member Profile** - per-member voting record
+- **About** - a description of Gadfly, its impetus, where it currently is and where the project is heading
+- **Prompts** - the prompts that are sent to Claude along with the legislation so that it can be characterized
 
-### Member Profile Page _(Planned)_
+### Member Profile Page
 
 The **header** (always visible) displays: photo, chamber, state, and party.
 
@@ -162,8 +156,7 @@ Below the header, tabbed sections:
 
 | Tab | Contents |
 |---|---|
-| **Voting Profile** | Directional-lean bars across the 11 categories, plus the member's vote log with summaries and flags |
-| **Legislation** | Bills the member sponsored or cosponsored, by policy area |
+| **Voting Profile** | Directional-lean bars across the 11 categories|
 
 ---
 
@@ -171,7 +164,7 @@ Below the header, tabbed sections:
 
 | Layer | Technology |
 |---|---|
-| Data storage | SQLite |
+| Data storage | PostgreSQL |
 | Backend | Python / Flask |
 | AI categorization | Claude API |
 | Data source | Congress API |
