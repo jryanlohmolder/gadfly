@@ -1,0 +1,18 @@
+= Table Structures
+:author: Joshua Ryan Lohmolder
+:revdate: 2026-09-08
+
+[cols="1,1,1,1,1,1,1,1,1"]
+|===
+| Members | Bills | Bill Versions | Votes | Member Votes | Categories | Flags | Sponsored Legislation | Cosponsored Legislation
+
+| Member ID | Bill ID | Version ID | Vote ID | Member Vote ID | Category ID | Flag ID | Sponsored ID | Cosponsored ID
+| First Name | Legislation Number | Version Number | Roll Call Number | Position | Category | Flag | Policy Area | Policy Area
+| Last Name | Bill Title | Change(s) Made | Congress | | Directional Binary | Severity | |
+| State | Legislation Type | Vote Placed | Session |  | Quote | Flag Quote | |
+| District | Number of Versions | Chunk Count | Chamber | | Category Flag | | |
+| Chamber | Legislative Status | Bill Text | Result of Vote | | | | |
+| Party | Summary | | | | | | |
+| Start Date | | | | | | | |
+| Served Before | | | | | | | |
+|===

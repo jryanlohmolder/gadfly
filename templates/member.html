@@ -10,10 +10,10 @@
     <img src="{{ member.picture_url }}" style="width: 250px;">
 
     <div style="display: flex; padding-left: 2rem; margin-top: 2rem;">
-        <button onclick="showTab('voting')" class="tab-btn active-tab" id="btn-voting">Voting Profile</button>
+        <button onclick="showTab('voter-profile')" class="tab-btn active-tab" id="btn-voter-profile">Voter Profile</button>
     </div>
 
-    <div id="voting" class="tab-panel" style="display: block;">
+    <div id="voter-profile" class="tab-panel" style="display: block;">
         {% for category, data in scores.items() %}
         <div style="margin-bottom: 1.5rem; text-align: center;">
             <h3>{{ category }}</h3>

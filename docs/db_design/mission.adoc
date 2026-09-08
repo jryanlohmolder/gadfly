@@ -1,0 +1,22 @@
+= Mission Statement & Mission Objectives
+:author: Joshua Ryan Lohmolder
+:revdate: 2026-08-31
+
+== Mission Statement
+Gadfly is an open source civic transparency tool designed and optimized to keep congress accountable. The database
+exists to act as a repository for congressional representative voting and financial data and then convert that data
+into a clear concise congressional profile for every member of congress.
+
+== Mission Objectives
+. _Voter Profile_: categorizes each piece of legislation voted on by both chambers across each of the 11 categories
+so each representatives voting record can be converted to easily digestible voter profiles. Filtered for current congress
+or for their full tenure in congress.
+. _Human Verification_: four eyes principle will be followed, meaning that two people will review and then either
+approve or amend each categorization, at the field level, with the verification process documented in the database.
+. _Full Access to Legislative Data_: this will allow any user to search through Gadfly's legislative repository, searchable
+by either category or by bill, and can be used to see any representative's full voting history.
+. _Representative Report Card_: tracks bills sponsored, cosponsored, tracking their relevant categories and directional binaries,
+in addition to flags and attendance for each congressional member.
+. _Financial Record_: Both a pie chart to show relative contributions as well as total amounts donated by any organization or 
+individual donors (will be its own separate category), searchable by either the current congress or the representatives entire
+tenure.
